@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import traceback
+import smtplib
 from master import DashboardMaster
-from mailer import Mailer
-from mailer import Message
 from config import MAILER_HOST, MAILER_TO, MAILER_FROM, MAILER_SUBJECT
 
 if __name__ == '__main__':
@@ -12,13 +11,11 @@ if __name__ == '__main__':
 		dashboard_master.run()
 	except Exception, e:
 		print "Exception caught, details and the traceback will be sent to %s" % MAILER_TO
-		message = Message(From=MAILER_FROM,
-		                  To=MAILER_TO,
-		                  charset="utf-8")
-		message.Subject = MAILER_SUBJECT
-		message.Body 		= traceback.format_exc()
+		msg = ("From: %s\r\nTo: %s\r\n\r\n"
+       % (MAILER_FROM, ", ".join(MAILER_TO)))
+		msg = msg + traceback.format_exc()
 
-		sender = Mailer(MAILER_HOST)
-		sender.send(message)
+		server = smtplib.SMTP(MAILER_HOST)
+		server.sendmail(MAILER_FROM, MAILER_TO, msg)
 	finally:
 		print "Finished"
