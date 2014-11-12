@@ -136,7 +136,7 @@ class DashboardMaster(object):
 
 		""" Доля заполненных анкет """
 		self.cur.execute(""" SELECT 
-			SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT / COUNT(c.fullness) AS filled, 
+			100 * SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT / COUNT(c.fullness) AS filled, 
 			t.shop_id
 			FROM card t JOIN customer c 
 			ON t.customer_id = c.id 
@@ -188,7 +188,7 @@ class DashboardMaster(object):
 
 		""" Доля заполненных анкет """
 		self.cur.execute(""" SELECT 
-			SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT / COUNT(c.fullness) AS filled, 
+			100 * SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT / COUNT(c.fullness) AS filled, 
 			t.company_id
 			FROM card t JOIN customer c 
 			ON t.customer_id = c.id 
@@ -583,7 +583,7 @@ class DashboardMaster(object):
 
 		""" Доля заполненных анкет """
 		data = self.find_brand_data(brand_id, self.brands_filled_profiles) or {'filled': 0}
-		dashboard_data['filled_profiles'] = percent
+		dashboard_data['filled_profiles'] = data['filled']
 
 
 		""" Доля продаж по картам с начала месяца """
