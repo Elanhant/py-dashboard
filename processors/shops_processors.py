@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from processor import DashboardProcessor
-from brands_processors import BrandsCustomersByPurchases, BrandsRePurchases, BrandsRePurchasesTotals
 from config import AGGREGATED_CARDS_BY_PURCHASES_SHOPS, AGGREGATED_RE_PURCHASES_SHOPS, AGGREGATED_RE_PURCHASES_TOTALS_SHOPS, AGGREGATED_CHEQUES_PER_PERIOD
 from datetime import datetime, timedelta
 import time
