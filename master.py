@@ -608,15 +608,17 @@ class DashboardMaster(object):
 		data 		= self.find_brand_data(brand_id, self.brands_cards_added) or {'month': 0, 'week': 0, 'day': 0}		
 		result = self.client[self.db_name][AGGREGATED_CHEQUES_PER_PERIOD].aggregate([
 			{
+				'$match': {'brand_id': brand_id}
+			},
+			{
 				'$group': {
-					'_id': 		'$brand_id',
+					'_id': 		None,
 					'month':	{"$sum": '$month'},
 					'week':		{"$sum": '$week'},
 					'day':		{"$sum": '$day'}
 				}
 			}
 		])
-		print result
 		cheques = {'month': 0, 'week': 0, 'day': 0} if not result['result'] else result['result'][0]
 		dashboard_data['cards_added_month'] = 0 if cheques['month'] == 0 else 100.0 * data['month'] / cheques['month']
 		dashboard_data['cards_added_week'] 	= 0 if cheques['week'] == 0 else 100.0 * data['week'] / cheques['week']
