@@ -658,6 +658,19 @@ class DashboardMaster(object):
 			'used': 		0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator']['used'] / aggregated['denominator'],
 		}
 		dashboard_data['bonuses_data'] = percents
+		
+
+		""" Число покупателей за позавчерашний день """
+		last_day_start 		= self.today - timedelta(days=2)
+		last_day_start_ts = int(time.mktime(last_day_start.timetuple()))
+		data = self.client[self.db_name][DASHBOARD_CHEQUES_COLLECTION].find({
+			'brand_id': brand_id, 
+			'date': {
+				'$gte': last_day_start_ts,
+				'$lte': self.yesterday_ts
+			}
+			}).count()
+		dashboard_data['last_day_customers'] = 0 if not data else data
 
 
 		self.update_dashboard({"brand_id": brand_id}, dashboard_data)
@@ -772,6 +785,19 @@ class DashboardMaster(object):
 			data.append(week_data)
 		data.reverse()
 		dashboard_data['sales_data'] = data
+
+
+		""" Число покупателей за позавчерашний день """
+		last_day_start 		= self.today - timedelta(days=2)
+		last_day_start_ts = int(time.mktime(last_day_start.timetuple()))
+		data = self.client[self.db_name][DASHBOARD_CHEQUES_COLLECTION].find({
+			'shop_id': shop_id, 
+			'date': {
+				'$gte': last_day_start_ts,
+				'$lte': self.yesterday_ts
+			}
+			}).count()
+		dashboard_data['last_day_customers'] = 0 if not data else data
 
 
 		self.update_dashboard({"brand_id": brand_id, "shop_id": shop_id}, dashboard_data)
