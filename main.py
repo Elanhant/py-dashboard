@@ -11,8 +11,8 @@ if __name__ == '__main__':
 		dashboard_master.run()
 	except Exception, e:
 		print "Exception caught, details and the traceback will be sent to %s" % MAILER_TO
-		msg = ("From: %s\r\nTo: %s\r\n\r\n"
-       % (MAILER_FROM, ", ".join(MAILER_TO)))
+		msg = ("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n"
+       % (MAILER_FROM, ", ".join(MAILER_TO), MAILER_SUBJECT))
 		msg = msg + traceback.format_exc()
 
 		server = smtplib.SMTP(MAILER_HOST)
