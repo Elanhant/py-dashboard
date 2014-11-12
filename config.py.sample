@@ -33,6 +33,7 @@ AGGREGATED_RE_PURCHASES_SHOPS 				= 'py_tmp_rp_shops'
 AGGREGATED_RE_PURCHASES_BRANDS 				= 'py_tmp_rp_brands'
 AGGREGATED_RE_PURCHASES_TOTALS_SHOPS 	= 'py_tmp_rp_t_shops'
 AGGREGATED_RE_PURCHASES_TOTALS_BRANDS = 'py_tmp_rp_t_brands'
+AGGREGATED_CHEQUES_PER_PERIOD					= 'py_tml_cpp'
 
 """ Настройки отправки e-mail """
 MAILER_HOST 		= '176.58.108.53'

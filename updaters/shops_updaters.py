@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from updater import Updater
-from processors.shops_processors import ShopsCustomersByPurchases, ShopsRePurchases, ShopsRePurchasesTotals, CustomersByPurchases, RePurchasesMonth, RePurchasesMonthTotals
+from processors.shops_processors import ShopsCustomersByPurchases, ShopsRePurchases, ShopsRePurchasesTotals, CustomersByPurchases, RePurchasesMonth, RePurchasesMonthTotals, ChequesPerPeriodProcessor
 from datetime import datetime, timedelta
 import time
 
@@ -485,6 +485,23 @@ class RePurchasesMonthTotalsUpdater(Updater):
 
 	def calculate_total_data(self):
 		processor = RePurchasesMonthTotals('card_number')	
+		processor.run(self.split_keys)
+		result = processor.result
+		return result
+
+	def calculate_day_data(self, today_ts, yesterday_ts):
+		self.calculate_total_data()
+
+
+class ChequesPerPeriod(Updater):
+	""" Число чеков за месяц, неделю, прошедший день """
+	def __init__(self, split_keys=None):
+		super(ChequesPerPeriod, self).__init__()
+		self.name 			= 'cheques_per_period'
+		self.split_keys = split_keys
+
+	def calculate_total_data(self):
+		processor = ChequesPerPeriodProcessor('card_number')	
 		processor.run(self.split_keys)
 		result = processor.result
 		return result

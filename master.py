@@ -102,7 +102,7 @@ class DashboardMaster(object):
 				# print "Took %s ms to calculate dashboard for shop %s" % (current_milli_time() - t_start, shop_tuple[0])
 
 		if CLEAR_TEMPORARY_COLLECTIONS is True:
-			for c in [DASHBOARD_CHEQUES_MONTH_COLLECTION, AGGREGATED_CARDS_BY_PURCHASES_SHOPS, AGGREGATED_CARDS_BY_PURCHASES_BRANDS, AGGREGATED_RE_PURCHASES_SHOPS, AGGREGATED_RE_PURCHASES_BRANDS, AGGREGATED_RE_PURCHASES_TOTALS_SHOPS, AGGREGATED_RE_PURCHASES_TOTALS_BRANDS]:
+			for c in [DASHBOARD_CHEQUES_MONTH_COLLECTION, AGGREGATED_CARDS_BY_PURCHASES_SHOPS, AGGREGATED_CARDS_BY_PURCHASES_BRANDS, AGGREGATED_RE_PURCHASES_SHOPS, AGGREGATED_RE_PURCHASES_BRANDS, AGGREGATED_RE_PURCHASES_TOTALS_SHOPS, AGGREGATED_RE_PURCHASES_TOTALS_BRANDS, AGGREGATED_CHEQUES_PER_PERIOD]:
 				self.client[self.db_name][c].drop()
 			for w in range(8):
 				self.client[self.db_name][WEEKS_SALES_COLLECTION_PREFIX + str(w)].drop()
@@ -218,6 +218,10 @@ class DashboardMaster(object):
 		""" Продажи за 8 недель """
 		sales_updater = admin_updaters.SalesUpdater()
 		sales_updater.run()
+
+		""" Число чеков за месяц, неделю и вчера """
+		cheques_per_period_updater = shops_updaters.ChequesPerPeriod()
+		cheques_per_period_updater.run()
 
 		""" Доли клиентов с определенным числом покупок (для магазинов) """
 		customers_by_purchases_updater = shops_updaters.CustomersByPurchasesUpdaterNew(split_keys=self.splitted_keys)
@@ -601,10 +605,22 @@ class DashboardMaster(object):
 
 
 		""" Доля выданных бонусных карт с начала месяца """
-		data = self.find_brand_data(brand_id, self.brands_cards_added) or {'month': 0, 'week': 0, 'day': 0}
-		dashboard_data['cards_added_month'] = data['month']
-		dashboard_data['cards_added_week'] 	= data['week']
-		dashboard_data['cards_added_day'] 	= data['day']
+		data 		= self.find_brand_data(brand_id, self.brands_cards_added) or {'month': 0, 'week': 0, 'day': 0}		
+		result = self.client[self.db_name][AGGREGATED_CHEQUES_PER_PERIOD].aggregate([
+			{
+				'$group': {
+					'_id': 		'$brand_id',
+					'month':	{"$sum": '$month'},
+					'week':		{"$sum": '$week'},
+					'day':		{"$sum": '$day'}
+				}
+			}
+		])
+		print result
+		cheques = {'month': 0, 'week': 0, 'day': 0} if not result['result'] else result['result'][0]
+		dashboard_data['cards_added_month'] = 0 if cheques['month'] == 0 else 100.0 * data['month'] / cheques['month']
+		dashboard_data['cards_added_week'] 	= 0 if cheques['week'] == 0 else 100.0 * data['week'] / cheques['week']
+		dashboard_data['cards_added_day'] 	= 0 if cheques['day'] == 0 else 100.0 * data['day'] / cheques['day']
 
 
 		""" Соотношение полов """
@@ -758,10 +774,11 @@ class DashboardMaster(object):
 
 
 		""" Доли выданных бонусных карт с начала месяца, недели и вчерашнего дня """
-		data = self.find_shop_data(shop_id, self.shops_cards_added) or {'month': 0, 'week': 0, 'day': 0}
-		dashboard_data['cards_added_month'] = data['month']
-		dashboard_data['cards_added_week'] 	= data['week']
-		dashboard_data['cards_added_day'] 	= data['day']
+		data 		= self.find_shop_data(shop_id, self.shops_cards_added) or {'month': 0, 'week': 0, 'day': 0}
+		cheques = self.client[self.db_name][AGGREGATED_CHEQUES_PER_PERIOD].find_one({'shop_id': shop_id}) or {'month': 0, 'week': 0, 'day': 0}
+		dashboard_data['cards_added_month'] = 0 if cheques['month'] == 0 else 100.0 * data['month'] / cheques['month']
+		dashboard_data['cards_added_week'] 	= 0 if cheques['week'] == 0 else 100.0 * data['week'] / cheques['week']
+		dashboard_data['cards_added_day'] 	= 0 if cheques['day'] == 0 else 100.0 * data['day'] / cheques['day']
 
 
 		""" Соотношение полов """
