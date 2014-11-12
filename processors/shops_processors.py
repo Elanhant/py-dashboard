@@ -5,26 +5,6 @@ from config import AGGREGATED_CARDS_BY_PURCHASES_SHOPS, AGGREGATED_RE_PURCHASES_
 from datetime import datetime, timedelta
 import time
 
-class ShopsCustomersByPurchases(BrandsCustomersByPurchases):
-	""" """
-	def __init__(self, map_key_name, shop_id, start_ts=None, end_ts=None):
-		super(ShopsCustomersByPurchases,self).__init__(map_key_name, shop_id, start_ts, end_ts)
-		self.name 		= 'shops_customers_by_purchases'
-
-
-class ShopsRePurchases(BrandsRePurchases):	
-	""" """
-	def __init__(self, map_key_name, shop_id, start_ts=None, end_ts=None):
-		super(ShopsRePurchases,self).__init__(map_key_name, shop_id, start_ts, end_ts)
-		self.name 		= 'shops_repurchases'
-
-
-class ShopsRePurchasesTotals(BrandsRePurchasesTotals):	
-	""" """
-	def __init__(self, map_key_name, shop_id, start_ts=None, end_ts=None):
-		super(ShopsRePurchasesTotals,self).__init__(map_key_name, shop_id, start_ts, end_ts)
-		self.name 		= 'shops_repurchases_totals'
-
 
 class CustomersByPurchases(DashboardProcessor):
 	""" """

@@ -224,11 +224,11 @@ class DashboardMaster(object):
 		cheques_per_period_updater.run()
 
 		""" Доли клиентов с определенным числом покупок (для магазинов) """
-		customers_by_purchases_updater = shops_updaters.CustomersByPurchasesUpdaterNew(split_keys=self.splitted_keys)
+		customers_by_purchases_updater = shops_updaters.CustomersByPurchasesUpdater(split_keys=self.splitted_keys)
 		customers_by_purchases_updater.run()
 
 		""" Доли клиентов с определенным числом покупок (для брендов) """
-		customers_by_purchases_updater = brands_updaters.CustomersByPurchasesUpdaterNew(split_keys=self.splitted_keys)
+		customers_by_purchases_updater = brands_updaters.CustomersByPurchasesUpdater(split_keys=self.splitted_keys)
 		customers_by_purchases_updater.run()
 
 		""" Доли повторных покупок (для магазинов) """
