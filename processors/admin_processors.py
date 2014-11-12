@@ -77,7 +77,7 @@ class AdminCustomersByPurchases(DashboardProcessor):
 		self.pipeline = [
 	    {"$match": {"card_number": {"$ne": ''}}},
 	    {"$group": {
-	        "_id": { "brand": '$brand', "card_number": '$card_number' },
+	        "_id": { "brand_id": '$brand_id', "card_number": '$card_number' },
 	        "card_number": { "$first": '$card_number' },
 	        "cheques": { "$sum": 1 },
 	        "last_ts": {"$max": "$date"}
