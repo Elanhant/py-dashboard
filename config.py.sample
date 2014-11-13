@@ -40,3 +40,6 @@ MAILER_HOST 		= '176.58.108.53'
 MAILER_FROM 		= "abcd@efgh.com"
 MAILER_TO				= "ijkl@mnop.com"
 MAILER_SUBJECT 	= "Dashboard master crashed"
+
+""" Настройки логирования """
+LOG_FILE_NAME 	= 'runtime.log'

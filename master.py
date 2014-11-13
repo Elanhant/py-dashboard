@@ -25,7 +25,8 @@ class DashboardMaster(object):
 	def find_brand_data(brand_id, haystack):
 		return next((item for item in haystack if item["company_id"] == brand_id), None)
 
-	def __init__(self):
+	def __init__(self, log=None):
+		self.log 						= log
 		self.cur 						= self.postgres_conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 		self.today 					= datetime.today().replace(hour=0, minute=0, second=0)
 		self.today_ts 			= int(time.mktime(self.today.timetuple()))
@@ -53,21 +54,28 @@ class DashboardMaster(object):
 		self.shops_participants_counts 	= []
 
 
+	def print_message(self, msg, to_console=True):
+		if to_console is True or self.log is None:
+			print msg
+		if self.log is not None:
+			self.log.write(msg + '\n')
+
+
 	def run(self):		
 		run_start = current_milli_time()	
-		print "Dashboard Updater Started at %s" % time.ctime()
+		self.print_message("Dashboard Updater Started at %s" % time.ctime())
 
 		# Заполняем (или обновляем) собственную таблицу чеков
 		if self.client[self.db_name][DASHBOARD_CHEQUES_COLLECTION].count() == 0 or FORCE_REFILL is True:
 			self.fill_cheques()
 		else:
 			self.update_cheques()
-		print "Took %s ms to fill cheques" % (current_milli_time() - run_start,)
+		self.print_message("Took %s ms to fill cheques" % (current_milli_time() - run_start,))
 
 		# Разбиваем коллекцию на блоки
 		t_start = current_milli_time()	
 		self.split_keys()
-		print "Took %s ms to split keys" % (current_milli_time() - t_start,)
+		self.print_message("Took %s ms to split keys" % (current_milli_time() - t_start,))
 
 		# При необходимости удаляем накопленные за прошлые запуски данные
 		if CLEAR_AGGREGATED_DATA is True:
@@ -86,14 +94,14 @@ class DashboardMaster(object):
 		# Вычисление дэшборда для администраторов
 		t_start = current_milli_time()	
 		self.calculate_admin_dashboard()
-		print "Took %s ms to calculate admin dashboard" % (current_milli_time() - t_start,)
+		self.print_message("Took %s ms to calculate admin dashboard" % (current_milli_time() - t_start,))
 
 		self.cur.execute(""" SELECT id FROM company""")
 		brands = self.cur.fetchall()
 		for brand_tuple in brands:
 			t_start = current_milli_time()	
 			self.calculate_brand_dashboard(brand_tuple[0])
-			print "Took %s ms to calculate dashboard for brand %s" % (current_milli_time() - t_start, brand_tuple[0])
+			self.print_message("Took %s ms to calculate dashboard for brand %s" % (current_milli_time() - t_start, brand_tuple[0]))
 			self.cur.execute(""" SELECT id FROM shop WHERE company_id = %s """, (brand_tuple[0], ))
 			shops = self.cur.fetchall()
 			for shop_tuple in shops:
@@ -107,7 +115,7 @@ class DashboardMaster(object):
 			for w in range(8):
 				self.client[self.db_name][WEEKS_SALES_COLLECTION_PREFIX + str(w)].drop()
 
-		print "The time is %s, took %s ms to complete" % (time.ctime(), current_milli_time() - run_start)
+		self.print_message("The time is %s, took %s ms to complete" % (time.ctime(), current_milli_time() - run_start))
 
 
 	def get_shops_postgre_data(self):
@@ -159,7 +167,7 @@ class DashboardMaster(object):
 		""" Количество участников """
 		self.cur.execute(""" SELECT COUNT(id), shop_id FROM card GROUP BY shop_id """)
 		self.shops_participants_counts = self.cur.fetchall()
-		print "Took %s ms to get shops data from POSTGRESQL" % (current_milli_time() - t_start, )
+		self.print_message("Took %s ms to get shops data from POSTGRESQL" % (current_milli_time() - t_start, ))
 
 
 	def get_brands_postgre_data(self):
@@ -211,7 +219,7 @@ class DashboardMaster(object):
 		""" Количество участников """
 		self.cur.execute(""" SELECT COUNT(id), company_id FROM card GROUP BY company_id """)
 		self.brands_participants_counts = self.cur.fetchall()
-		print "Took %s ms to get brands data from POSTGRESQL" % (current_milli_time() - t_start, )
+		self.print_message("Took %s ms to get brands data from POSTGRESQL" % (current_milli_time() - t_start, ))
 
 
 	def run_aggregators(self):
