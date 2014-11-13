@@ -2,6 +2,7 @@
 from multiprocessing import Process
 from pymongo import MongoClient
 import time, math, json, copy
+from config import MONGO_CLIENT_HOST, MONGO_DB_NAME, DASHBOARD_CHEQUES_COLLECTION
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
@@ -16,12 +17,11 @@ class DashboardProcessor(object):
 		self.start_ts = start_ts
 		self.end_ts = end_ts
 		self.collections = []
-		self.client 	= MongoClient('mongodb://127.0.0.1')
-		self.db_name = 'cardsmile'
-		self.db 			= self.client[self.db_name]
+		self.client 	= MongoClient(MONGO_CLIENT_HOST)
+		self.db 			= self.client[MONGO_DB_NAME]
 		self.subset_collection = 'dashboard_processor_subset'
 		self.target_collection = 'dashboard_python_results'
-		self.source_collection = 'dashboard_cheques'
+		self.source_collection = DASHBOARD_CHEQUES_COLLECTION
 		self.NUM_THREADS = 4
 		self.DEBUG = False
 
@@ -58,7 +58,7 @@ class DashboardProcessor(object):
 
 	def split_keys(self):
 		self.split_keys = self.db.command(
-			"splitVector", self.db_name + "." + self.source_collection,
+			"splitVector", MONGO_DB_NAME + "." + self.source_collection,
 			keyPattern={self.map_key_name : 1}, 
 			maxChunkSizeBytes=32000
 		)['splitKeys']
