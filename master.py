@@ -41,6 +41,8 @@ class DashboardMaster(object):
 
 		self.splitted_keys = None
 
+		self.cards_data 								= []
+		self.genders_data								= []
 		self.brands_cards_added					= []
 		self.brands_customers_data			= []
 		self.brands_filled_profiles			= []
@@ -102,12 +104,14 @@ class DashboardMaster(object):
 			t_start = current_milli_time()	
 			self.calculate_brand_dashboard(brand_tuple[0])
 			self.print_message("Took %s ms to calculate dashboard for brand %s" % (current_milli_time() - t_start, brand_tuple[0]))
+			
 			self.cur.execute(""" SELECT id FROM shop WHERE company_id = %s """, (brand_tuple[0], ))
 			shops = self.cur.fetchall()
+			t_start = current_milli_time()
 			for shop_tuple in shops:
 				t_start = current_milli_time()	
 				self.calculate_shop_dashboard(shop_tuple[0], brand_tuple[0])
-				# print "Took %s ms to calculate dashboard for shop %s" % (current_milli_time() - t_start, shop_tuple[0])
+			print "Took %s ms to calculate shops dashboards for brand %s" % (current_milli_time() - t_start, brand_tuple[0])
 
 		if CLEAR_TEMPORARY_COLLECTIONS is True:
 			for c in [DASHBOARD_CHEQUES_MONTH_COLLECTION, AGGREGATED_CARDS_BY_PURCHASES_SHOPS, AGGREGATED_CARDS_BY_PURCHASES_BRANDS, AGGREGATED_RE_PURCHASES_SHOPS, AGGREGATED_RE_PURCHASES_BRANDS, AGGREGATED_RE_PURCHASES_TOTALS_SHOPS, AGGREGATED_RE_PURCHASES_TOTALS_BRANDS, AGGREGATED_CHEQUES_PER_PERIOD]:
@@ -120,106 +124,47 @@ class DashboardMaster(object):
 
 	def get_shops_postgre_data(self):
 		t_start = current_milli_time()
-		""" Количество добавленнных карт """
-		self.cur.execute(""" SELECT 
-			SUM(CASE WHEN date_create >= %s THEN 1 ELSE 0 END) as month,
-			SUM(CASE WHEN date_create >= %s THEN 1 ELSE 0 END) as week,
-			SUM(CASE WHEN date_create >= %s THEN 1 ELSE 0 END) as day,
-			shop_id
-			FROM card
-			GROUP BY shop_id """, (self.month_start_ts, self.week_start_ts, self.yesterday_ts))
-		self.shops_cards_added = self.cur.fetchall()
-
-		""" Доли каналов коммуникации и согласных на рассылку """
-		self.cur.execute(""" SELECT 
-			SUM(CASE WHEN channel = 3 THEN 1 ELSE 0 END)::FLOAT AS all, 
-			SUM(CASE WHEN channel = 1 THEN 1 ELSE 0 END)::FLOAT AS email, 
-			SUM(CASE WHEN channel = 2 THEN 1 ELSE 0 END)::FLOAT AS sms,
-			SUM(CASE WHEN channel = 0 THEN 1 ELSE 0 END)::FLOAT AS unknown,
-			SUM(CASE WHEN subscription THEN 1 ELSE 0 END)::FLOAT as subscribed,
-			COUNT(id) as total,
-			shop_id
-			FROM card GROUP BY shop_id """)
-		self.shops_customers_data = self.cur.fetchall()
-
-		""" Доля заполненных анкет """
-		self.cur.execute(""" SELECT 
-			100 * SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT / COUNT(c.fullness) AS filled, 
-			t.shop_id
-			FROM card t JOIN customer c 
-			ON t.customer_id = c.id 
-			GROUP BY t.shop_id """)
-		self.shops_filled_profiles = self.cur.fetchall()
-
 		""" Соотношение полов """
 		self.cur.execute(""" SELECT 
 			SUM(CASE WHEN p.gender = \'m\' THEN 1 ELSE 0 END) as male,
 			SUM(CASE WHEN p.gender = \'f\' THEN 1 ELSE 0 END) as female,
 			SUM(CASE WHEN p.gender = \'u\' THEN 1 ELSE 0 END) as undefined,
 			COUNT(p.digital_id) as total,
-			c.shop_id as shop_id
+			c.shop_id as shop_id,
+			c.company_id
 			FROM personal_data p 
 			JOIN customer cst ON cst.digital_id = p.digital_id 
 			JOIN card c ON c.customer_id = cst.id
-			GROUP BY c.shop_id""")
-		self.shops_genders_data = self.cur.fetchall()
-
-		""" Количество участников """
-		self.cur.execute(""" SELECT COUNT(id), shop_id FROM card GROUP BY shop_id """)
-		self.shops_participants_counts = self.cur.fetchall()
-		self.print_message("Took %s ms to get shops data from POSTGRESQL" % (current_milli_time() - t_start, ))
+			GROUP BY c.shop_id, c.company_id""")
+		self.genders_data = self.cur.fetchall()
+		self.print_message("Took %s ms to get genders data from POSTGRESQL DB" % (current_milli_time() - t_start, ))
 
 
 	def get_brands_postgre_data(self):
 		t_start = current_milli_time()
 		""" Количество добавленнных карт """
-		self.cur.execute(""" SELECT 
-			SUM(CASE WHEN date_create >= %s THEN 1 ELSE 0 END) as month,
-			SUM(CASE WHEN date_create >= %s THEN 1 ELSE 0 END) as week,
-			SUM(CASE WHEN date_create >= %s THEN 1 ELSE 0 END) as day,
-			company_id
-			FROM card
-			GROUP BY company_id """, (self.month_start_ts, self.week_start_ts, self.yesterday_ts))
-		self.brands_cards_added = self.cur.fetchall()
-
 		""" Доли каналов коммуникации и согласных на рассылку """
-		self.cur.execute(""" SELECT 
-			SUM(CASE WHEN channel = 3 THEN 1 ELSE 0 END)::FLOAT AS all, 
-			SUM(CASE WHEN channel = 1 THEN 1 ELSE 0 END)::FLOAT AS email, 
-			SUM(CASE WHEN channel = 2 THEN 1 ELSE 0 END)::FLOAT AS sms,
-			SUM(CASE WHEN channel = 0 THEN 1 ELSE 0 END)::FLOAT AS unknown,
-			SUM(CASE WHEN subscription THEN 1 ELSE 0 END)::FLOAT as subscribed,
-			COUNT(id) as total,
-			company_id
-			FROM card GROUP BY company_id """)
-		self.brands_customers_data = self.cur.fetchall()
-
 		""" Доля заполненных анкет """
+		""" Количество участников """
 		self.cur.execute(""" SELECT 
-			100 * SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT / COUNT(c.fullness) AS filled, 
-			t.company_id
+			SUM(CASE WHEN t.channel = 3 THEN 1 ELSE 0 END)::FLOAT AS all, 
+			SUM(CASE WHEN t.channel = 1 THEN 1 ELSE 0 END)::FLOAT AS email, 
+			SUM(CASE WHEN t.channel = 2 THEN 1 ELSE 0 END)::FLOAT AS sms,
+			SUM(CASE WHEN t.channel = 0 THEN 1 ELSE 0 END)::FLOAT AS unknown,
+			SUM(CASE WHEN t.subscription THEN 1 ELSE 0 END)::FLOAT as subscribed,
+			SUM(CASE WHEN t.date_create >= %s THEN 1 ELSE 0 END) as month,
+			SUM(CASE WHEN t.date_create >= %s THEN 1 ELSE 0 END) as week,
+			SUM(CASE WHEN t.date_create >= %s THEN 1 ELSE 0 END) as day,
+			SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT AS filled, 
+			COUNT(c.fullness) as profiles,
+			COUNT(t.id) as total,
+			t.company_id,
+			t.shop_id
 			FROM card t JOIN customer c 
 			ON t.customer_id = c.id 
-			GROUP BY t.company_id """)
-		self.brands_filled_profiles = self.cur.fetchall()
-
-		""" Соотношение полов """
-		self.cur.execute(""" SELECT 
-			SUM(CASE WHEN p.gender = \'m\' THEN 1 ELSE 0 END) as male,
-			SUM(CASE WHEN p.gender = \'f\' THEN 1 ELSE 0 END) as female,
-			SUM(CASE WHEN p.gender = \'u\' THEN 1 ELSE 0 END) as undefined,
-			COUNT(p.digital_id) as total,
-			c.company_id as company_id
-			FROM personal_data p 
-			JOIN customer cst ON cst.digital_id = p.digital_id 
-			JOIN card c ON c.customer_id = cst.id
-			GROUP BY c.company_id""")
-		self.brands_genders_data = self.cur.fetchall()
-
-		""" Количество участников """
-		self.cur.execute(""" SELECT COUNT(id), company_id FROM card GROUP BY company_id """)
-		self.brands_participants_counts = self.cur.fetchall()
-		self.print_message("Took %s ms to get brands data from POSTGRESQL" % (current_milli_time() - t_start, ))
+			GROUP BY t.company_id, t.shop_id """, (self.month_start_ts, self.week_start_ts, self.yesterday_ts))
+		self.cards_data = self.cur.fetchall()
+		self.print_message("Took %s ms to get cards data from POSTGRESQL DB" % (current_milli_time() - t_start, ))
 
 
 	def run_aggregators(self):
@@ -386,18 +331,18 @@ class DashboardMaster(object):
 
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
 		t_start = current_milli_time()
-		total 		= sum([data['total'] for data in self.brands_customers_data])
+		total 		= sum([data['total'] for data in self.cards_data])
 		percents	= {
 			'channels': {
-				'all': 			0 if total == 0 else 100.0 * sum([data['all'] for data in self.brands_customers_data]) / total,
-				'email': 		0 if total == 0 else 100.0 * sum([data['email'] for data in self.brands_customers_data]) / total,
-				'sms': 			0 if total == 0 else 100.0 * sum([data['sms'] for data in self.brands_customers_data]) / total,
-				'unknown': 	0 if total == 0 else 100.0 * sum([data['unknown'] for data in self.brands_customers_data]) / total,
+				'all': 			0 if total == 0 else 100.0 * sum([data['all'] for data in self.cards_data]) / total,
+				'email': 		0 if total == 0 else 100.0 * sum([data['email'] for data in self.cards_data]) / total,
+				'sms': 			0 if total == 0 else 100.0 * sum([data['sms'] for data in self.cards_data]) / total,
+				'unknown': 	0 if total == 0 else 100.0 * sum([data['unknown'] for data in self.cards_data]) / total,
 			},
-			'subscribed': 0 if total == 0 else 100.0 * sum([data['subscribed'] for data in self.brands_customers_data]) / total,
+			'subscribed': 0 if total == 0 else 100.0 * sum([data['subscribed'] for data in self.cards_data]) / total,
 		}
 		self.print_message("Took %s ms for CUSTOMERS" % (current_milli_time() - t_start, ))
-		
+
 		dashboard_data['channels_data'] = percents['channels']
 		dashboard_data['subscribed'] 		= percents['subscribed']
 
@@ -450,11 +395,11 @@ class DashboardMaster(object):
 
 		""" Соотношение полов """
 		t_start 	= current_milli_time()
-		total 		= sum([data['total'] for data in self.brands_genders_data])
+		total 		= sum([data['total'] for data in self.genders_data])
 		percents	= {
-			'male': 			0 if total == 0 else 100.0 * sum([data['male'] for data in self.brands_genders_data]) / total,
-			'female': 		0 if total == 0 else 100.0 * sum([data['female'] for data in self.brands_genders_data]) / total,
-			'undefined': 	0 if total == 0 else 100.0 * sum([data['undefined'] for data in self.brands_genders_data]) / total,
+			'male': 			0 if total == 0 else 100.0 * sum([data['male'] for data in self.genders_data]) / total,
+			'female': 		0 if total == 0 else 100.0 * sum([data['female'] for data in self.genders_data]) / total,
+			'undefined': 	0 if total == 0 else 100.0 * sum([data['undefined'] for data in self.genders_data]) / total,
 		}
 		self.print_message("Took %s ms for GENDERS" % (current_milli_time() - t_start, ))
 
@@ -463,7 +408,7 @@ class DashboardMaster(object):
 
 		""" Клиентская база """
 		t_start = current_milli_time()
-		total = sum([data['count'] for data in self.brands_participants_counts])
+		total = sum([data['total'] for data in self.cards_data])
 		self.print_message("Took %s ms for CLIENT BASE" % (current_milli_time() - t_start, ))
 
 		dashboard_data['participants_count'] = total
@@ -527,10 +472,9 @@ class DashboardMaster(object):
 		percents 		= {}
 		self.cur.execute(""" SELECT id as company_id, name FROM company """)
 		brands_names = self.cur.fetchall()
-		total = sum([pair['count'] for pair in self.brands_participants_counts])
-		for brand_participants in self.brands_participants_counts:
-			pair = self.find_brand_data(brand_participants['company_id'], brands_names)
-			percents[pair['name']] = 0 if total == 0 else 100.0 * brand_participants['count'] / total
+		total = sum([pair['total'] for pair in self.cards_data])
+		for brand in brands_names:			
+			percents[brand['name']] = 0 if total == 0 else 100.0 * sum([d['total'] for d in self.cards_data if d['company_id'] == brand['company_id']]) / total
 		self.print_message("Took %s ms for PARTICIPANTS BY BRANDS" % (current_milli_time() - t_start, ))
 
 		dashboard_data['participants_by_brands'] = percents
@@ -544,16 +488,19 @@ class DashboardMaster(object):
 			'type'		: 'operator'
 		}
 
+		brand_cards_data 		= [d for d in self.cards_data if d['company_id'] == brand_id]
+		brand_genders_data 	= [d for d in self.genders_data if d['company_id'] == brand_id]
+
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
-		data = self.find_brand_data(brand_id, self.brands_customers_data) or {'total': 0, 'email': 0, 'sms': 0, 'unknown': 0, 'subscribed': 0}
+		total = sum([d['total'] for d in brand_cards_data])
 		percents = {
 			'channels': {
-				'all': 			0 if data['total'] == 0 else 100.0 * data['all'] / data['total'],
-				'email': 		0 if data['total'] == 0 else 100.0 * data['email'] / data['total'],
-				'sms': 			0 if data['total'] == 0 else 100.0 * data['sms'] / data['total'],
-				'unknown': 	0 if data['total'] == 0 else 100.0 * data['unknown'] / data['total'],
+				'all': 			0 if total == 0 else 100.0 * sum([d['all'] for d in brand_cards_data]) / total,
+				'email': 		0 if total == 0 else 100.0 * sum([d['email'] for d in brand_cards_data]) / total,
+				'sms': 			0 if total == 0 else 100.0 * sum([d['sms'] for d in brand_cards_data]) / total,
+				'unknown': 	0 if total == 0 else 100.0 * sum([d['unknown'] for d in brand_cards_data]) / total,
 			},
-			'subscribed': 0 if data['total'] == 0 else 100.0 * data['subscribed'] / data['total'],
+			'subscribed': 0 if total == 0 else 100.0 * sum([d['subscribed'] for d in brand_cards_data]) / total,
 		}
 		dashboard_data['channels_data'] = percents['channels']
 		dashboard_data['subscribed'] = percents['subscribed']
@@ -581,12 +528,12 @@ class DashboardMaster(object):
 			},
 		}
 		if aggregated is not None:
-			denominator = self.find_brand_data(brand_id, self.brands_participants_counts) or {'count': 0}
+			total = sum([d['total'] for d in brand_cards_data])
 			for key in ['qty_1', 'qty_2', 'qty_3']:
 				cards_with_cheques += aggregated[key]
-				percents[key]['value'] = 0 if denominator['count'] == 0 else 100.0 * aggregated[key] / denominator['count']
-			no_cheques = denominator['count'] - cards_with_cheques
-			percents['qty_0']['value'] = 0 if denominator['count'] == 0 else 100.0 * no_cheques / denominator['count']
+				percents[key]['value'] = 0 if total == 0 else 100.0 * aggregated[key] / total
+			no_cheques = total - cards_with_cheques
+			percents['qty_0']['value'] = 0 if total == 0 else 100.0 * no_cheques / total
 		dashboard_data['progress_data'] = percents
 
 
@@ -599,8 +546,8 @@ class DashboardMaster(object):
 
 
 		""" Доля заполненных анкет """
-		data = self.find_brand_data(brand_id, self.brands_filled_profiles) or {'filled': 0}
-		dashboard_data['filled_profiles'] = data['filled']
+		total = sum([d['profiles'] for d in brand_cards_data])
+		dashboard_data['filled_profiles'] = 0 if total == 0 else 100.0 * sum([d['filled'] for d in brand_cards_data]) / total
 
 
 		""" Доля продаж по картам с начала месяца """
@@ -613,12 +560,14 @@ class DashboardMaster(object):
 
 
 		""" Число участников """
-		data = self.find_brand_data(brand_id, self.brands_participants_counts) or {'count': 0}
-		dashboard_data['participants_count'] = data['count']
-
+		dashboard_data['participants_count'] = sum([d['total'] for d in brand_cards_data])
 
 		""" Доля выданных бонусных карт с начала месяца """
-		data 		= self.find_brand_data(brand_id, self.brands_cards_added) or {'month': 0, 'week': 0, 'day': 0}		
+		data = {
+			'month': 	sum([d['month'] for d in brand_cards_data]),
+			'week':		sum([d['week'] for d in brand_cards_data]),
+			'day': 		sum([d['day'] for d in brand_cards_data]),
+		}
 		result = self.client[self.db_name][AGGREGATED_CHEQUES_PER_PERIOD].aggregate([
 			{
 				'$match': {'brand_id': brand_id}
@@ -639,11 +588,11 @@ class DashboardMaster(object):
 
 
 		""" Соотношение полов """
-		data = self.find_brand_data(brand_id, self.brands_genders_data) or {'total': 0, 'email': 0, 'sms': 0, 'unknown': 0, 'subscribed': 0}
+		total = sum([d['total'] for d in brand_genders_data])
 		percents = {
-				'male': 			0 if data['total'] == 0 else 100.0 * data['male'] / data['total'],
-				'female': 		0 if data['total'] == 0 else 100.0 * data['female'] / data['total'],
-				'undefined': 	0 if data['total'] == 0 else 100.0 * data['undefined'] / data['total'],
+			'male': 			0 if total == 0 else 100.0 * sum([d['male'] for d in brand_genders_data]) / total,
+			'female': 		0 if total == 0 else 100.0 * sum([d['female'] for d in brand_genders_data]) / total,
+			'undefined': 	0 if total == 0 else 100.0 * sum([d['undefined'] for d in brand_genders_data]) / total,
 		}
 		dashboard_data['genders_data'] = percents
 
@@ -714,16 +663,19 @@ class DashboardMaster(object):
 			'type'		: 'seller'
 		}
 
+		shop_cards_data 	= [d for d in self.cards_data if d['shop_id'] == shop_id]
+		shop_genders_data = [d for d in self.genders_data if d['shop_id'] == shop_id]
+
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
-		data 			= self.find_shop_data(shop_id, self.shops_customers_data) or {'total': 0, 'email': 0, 'sms': 0, 'unknown': 0, 'subscribed': 0}
-		percents 	= {
+		total = sum([d['total'] for d in shop_cards_data])
+		percents = {
 			'channels': {
-				'all': 			0 if data['total'] == 0 else 100.0 * data['all'] / data['total'],
-				'email': 		0 if data['total'] == 0 else 100.0 * data['email'] / data['total'],
-				'sms': 			0 if data['total'] == 0 else 100.0 * data['sms'] / data['total'],
-				'unknown': 	0 if data['total'] == 0 else 100.0 * data['unknown'] / data['total'],
+				'all': 			0 if total == 0 else 100.0 * sum([d['all'] for d in shop_cards_data]) / total,
+				'email': 		0 if total == 0 else 100.0 * sum([d['email'] for d in shop_cards_data]) / total,
+				'sms': 			0 if total == 0 else 100.0 * sum([d['sms'] for d in shop_cards_data]) / total,
+				'unknown': 	0 if total == 0 else 100.0 * sum([d['unknown'] for d in shop_cards_data]) / total,
 			},
-			'subscribed': 0 if data['total'] == 0 else 100.0 * data['subscribed'] / data['total'],
+			'subscribed': 0 if total == 0 else 100.0 * sum([d['subscribed'] for d in shop_cards_data]) / total,
 		}
 		dashboard_data['channels_data'] = percents['channels']
 		dashboard_data['subscribed'] 		= percents['subscribed']
@@ -751,12 +703,12 @@ class DashboardMaster(object):
 			},
 		}
 		if aggregated is not None:
-			denominator = self.find_shop_data(shop_id, self.shops_participants_counts) or {'count': 0}
+			total = sum([d['total'] for d in shop_cards_data])
 			for key in ['qty_1', 'qty_2', 'qty_3']:
 				cards_with_cheques += aggregated[key]
-				percents[key]['value'] = 0 if denominator['count'] == 0 else 100.0 * aggregated[key] / denominator['count']
-			no_cheques = denominator['count'] - cards_with_cheques
-			percents['qty_0']['value'] = 0 if denominator['count'] == 0 else 100.0 * no_cheques / denominator['count']
+				percents[key]['value'] = 0 if total == 0 else 100.0 * aggregated[key] / total
+			no_cheques = total - cards_with_cheques			
+			percents['qty_0']['value'] = 0 if total == 0 else 100.0 * no_cheques / total
 
 		dashboard_data['progress_data'] = percents
 
@@ -770,8 +722,8 @@ class DashboardMaster(object):
 
 
 		""" Доля заполненных анкет """
-		data = self.find_shop_data(shop_id, self.shops_filled_profiles) or {'filled': 0}
-		dashboard_data['filled_profiles'] = data['filled']
+		total = sum([d['profiles'] for d in shop_cards_data])
+		dashboard_data['filled_profiles'] = 0 if total == 0 else 100.0 * sum([d['filled'] for d in shop_cards_data]) / total
 
 
 		""" Доля продаж по картам с начала месяца """
@@ -784,12 +736,15 @@ class DashboardMaster(object):
 
 
 		""" Число участников """
-		data = self.find_shop_data(shop_id, self.shops_participants_counts) or {'count': 0}
-		dashboard_data['participants_count'] = data['count']
+		dashboard_data['participants_count'] = sum([d['total'] for d in shop_cards_data])
 
 
 		""" Доли выданных бонусных карт с начала месяца, недели и вчерашнего дня """
-		data 		= self.find_shop_data(shop_id, self.shops_cards_added) or {'month': 0, 'week': 0, 'day': 0}
+		data = {
+			'month': 	sum([d['month'] for d in shop_cards_data]),
+			'week':		sum([d['week'] for d in shop_cards_data]),
+			'day': 		sum([d['day'] for d in shop_cards_data]),
+		}
 		cheques = self.client[self.db_name][AGGREGATED_CHEQUES_PER_PERIOD].find_one({'shop_id': shop_id}) or {'month': 0, 'week': 0, 'day': 0}
 		dashboard_data['cards_added_month'] = 0 if cheques['month'] == 0 else 100.0 * data['month'] / cheques['month']
 		dashboard_data['cards_added_week'] 	= 0 if cheques['week'] == 0 else 100.0 * data['week'] / cheques['week']
@@ -797,11 +752,11 @@ class DashboardMaster(object):
 
 
 		""" Соотношение полов """
-		data = self.find_shop_data(shop_id, self.shops_genders_data) or {'total': 0, 'email': 0, 'sms': 0, 'unknown': 0, 'subscribed': 0}
+		total = sum([d['total'] for d in shop_genders_data])
 		percents = {
-				'male': 			0 if data['total'] == 0 else 100.0 * data['male'] / data['total'],
-				'female': 		0 if data['total'] == 0 else 100.0 * data['female'] / data['total'],
-				'undefined': 	0 if data['total'] == 0 else 100.0 * data['undefined'] / data['total'],
+			'male': 			0 if total == 0 else 100.0 * sum([d['male'] for d in shop_genders_data]) / total,
+			'female': 		0 if total == 0 else 100.0 * sum([d['female'] for d in shop_genders_data]) / total,
+			'undefined': 	0 if total == 0 else 100.0 * sum([d['undefined'] for d in shop_genders_data]) / total,
 		}
 		dashboard_data['genders_data'] = percents
 
