@@ -373,8 +373,10 @@ class DashboardMaster(object):
 		}
 
 		""" Доля повторных покупок с начала года """
+		t_start = current_milli_time()
 		repurchases_updater = admin_updaters.RePurchasesUpdater(self.year_start_ts, 'admin_repurchases_year', split_keys=self.splitted_keys)
 		repurchases_updater.run()
+		self.print_message("Took %s ms for REPURCHASES YEAR" % (current_milli_time() - t_start, ))
 
 		aggregated 	= repurchases_updater.find_aggregated_data()	
 		totals 			= sum(aggregated['denominator'].itervalues())
@@ -383,34 +385,28 @@ class DashboardMaster(object):
 
 
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
-		customers_data_updater = admin_updaters.CustomersDataUpdater()
-		customers_data_updater.run()
-
-		aggregated 	= customers_data_updater.find_aggregated_data()
-		percents 		= {
+		t_start = current_milli_time()
+		total 		= sum([data['total'] for data in self.brands_customers_data])
+		percents	= {
 			'channels': {
-				'all': 			0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator']['all'] / aggregated['denominator'],
-				'email': 		0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator']['email'] / aggregated['denominator'],
-				'sms': 			0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator']['sms'] / aggregated['denominator'],
-				'unknown': 	0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator']['unknown'] / aggregated['denominator'],
+				'all': 			0 if total == 0 else 100.0 * sum([data['all'] for data in self.brands_customers_data]) / total,
+				'email': 		0 if total == 0 else 100.0 * sum([data['email'] for data in self.brands_customers_data]) / total,
+				'sms': 			0 if total == 0 else 100.0 * sum([data['sms'] for data in self.brands_customers_data]) / total,
+				'unknown': 	0 if total == 0 else 100.0 * sum([data['unknown'] for data in self.brands_customers_data]) / total,
 			},
-			'subscribed': 0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator']['subscribed'] / aggregated['denominator'],
+			'subscribed': 0 if total == 0 else 100.0 * sum([data['subscribed'] for data in self.brands_customers_data]) / total,
 		}
+		self.print_message("Took %s ms for CUSTOMERS" % (current_milli_time() - t_start, ))
+		
 		dashboard_data['channels_data'] = percents['channels']
 		dashboard_data['subscribed'] 		= percents['subscribed']
 
 
-		""" Число участников """
-		participants_count_updater = admin_updaters.ParticipantsCountUpdater()
-		participants_count_updater.run()
-		
-		aggregated = participants_count_updater.find_aggregated_data()	
-		dashboard_data['participants_count'] = aggregated['numerator']
-
-
 		""" Доли клиентов с определенным числом покупок """
+		t_start = current_milli_time()
 		customers_by_purchases_updater = admin_updaters.CustomersByPurchasesUpdater(split_keys=self.splitted_keys)
 		customers_by_purchases_updater.run()
+		self.print_message("Took %s ms for BY BURCHASES" % (current_milli_time() - t_start, ))
 
 		aggregated = customers_by_purchases_updater.find_aggregated_data()
 		cards_with_cheques = 0
@@ -441,8 +437,10 @@ class DashboardMaster(object):
 
 
 		""" Доля повторных покупок с начала месяца """
+		t_start = current_milli_time()
 		repurchases_updater = admin_updaters.RePurchasesUpdater(self.month_start_ts, 'admin_repurchases_month', split_keys=self.splitted_keys)
 		repurchases_updater.run()
+		self.print_message("Took %s ms for REPURCHASES MONTH" % (current_milli_time() - t_start, ))
 
 		aggregated 	= repurchases_updater.find_aggregated_data()	
 		totals 			= sum(aggregated['denominator'].itervalues())
@@ -451,29 +449,31 @@ class DashboardMaster(object):
 
 
 		""" Соотношение полов """
-		genders_data_updater = admin_updaters.GendersDataUpdater()
-		genders_data_updater.run()
-		
-		aggregated = genders_data_updater.find_aggregated_data()	
-		percents = {
-			'male': 			0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator']['male'] / aggregated['denominator'],
-			'female': 		0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator']['female'] / aggregated['denominator'],
-			'undefined': 	0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator']['undefined'] / aggregated['denominator'],
+		t_start 	= current_milli_time()
+		total 		= sum([data['total'] for data in self.brands_genders_data])
+		percents	= {
+			'male': 			0 if total == 0 else 100.0 * sum([data['male'] for data in self.brands_genders_data]) / total,
+			'female': 		0 if total == 0 else 100.0 * sum([data['female'] for data in self.brands_genders_data]) / total,
+			'undefined': 	0 if total == 0 else 100.0 * sum([data['undefined'] for data in self.brands_genders_data]) / total,
 		}
+		self.print_message("Took %s ms for GENDERS" % (current_milli_time() - t_start, ))
+
 		dashboard_data['genders_data'] = percents
 
 
 		""" Клиентская база """
-		participants_count_updater = admin_updaters.ParticipantsCountUpdater()
-		participants_count_updater.run()
+		t_start = current_milli_time()
+		total = sum([data['count'] for data in self.brands_participants_counts])
+		self.print_message("Took %s ms for CLIENT BASE" % (current_milli_time() - t_start, ))
 
-		aggregated = participants_count_updater.find_aggregated_data()
-		dashboard_data['participants_count'] = aggregated['numerator']
+		dashboard_data['participants_count'] = total
 
 
 		""" Доли списаний и начислений """
+		t_start = current_milli_time()
 		bonuses_updater = admin_updaters.BonusesUpdater(self.month_start_ts)
 		bonuses_updater.run()
+		self.print_message("Took %s ms for BONUSES" % (current_milli_time() - t_start, ))
 		
 		aggregated 	= bonuses_updater.find_aggregated_data()	
 		percents 		= {
@@ -484,8 +484,10 @@ class DashboardMaster(object):
 
 
 		""" Доля продаж по картам с начала месяца """
+		t_start = current_milli_time()
 		purchases_with_cards_updater = admin_updaters.PurchasesWithCardsUpdater(self.month_start_ts, self.today_ts)
 		purchases_with_cards_updater.run()
+		self.print_message("Took %s ms for PURCHASES WITH CARDS" % (current_milli_time() - t_start, ))
 
 		aggregated 	= purchases_with_cards_updater.find_aggregated_data()	
 		percent 		= 0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator'] / aggregated['denominator']
@@ -521,13 +523,16 @@ class DashboardMaster(object):
 
 
 		""" Число участников в разрезе брендов """
-		participants_by_brands_updater = admin_updaters.ParticipantsByBrandsUpdater()
-		participants_by_brands_updater.run()
-
-		aggregated 	= participants_by_brands_updater.find_aggregated_data()
+		t_start = current_milli_time()
 		percents 		= {}
-		for brand_name in aggregated['numerator']:
-			percents[brand_name] = 0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator'][brand_name] / aggregated['denominator']
+		self.cur.execute(""" SELECT id as company_id, name FROM company """)
+		brands_names = self.cur.fetchall()
+		total = sum([pair['count'] for pair in self.brands_participants_counts])
+		for brand_participants in self.brands_participants_counts:
+			pair = self.find_brand_data(brand_participants['company_id'], brands_names)
+			percents[pair['name']] = 0 if total == 0 else 100.0 * brand_participants['count'] / total
+		self.print_message("Took %s ms for PARTICIPANTS BY BRANDS" % (current_milli_time() - t_start, ))
+
 		dashboard_data['participants_by_brands'] = percents
 
 		self.update_dashboard({"brand_id": 0}, dashboard_data)
