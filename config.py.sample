@@ -36,7 +36,7 @@ AGGREGATED_RE_PURCHASES_TOTALS_BRANDS = 'py_tmp_rp_t_brands'
 AGGREGATED_CHEQUES_PER_PERIOD					= 'py_tml_cpp'
 
 """ Настройки отправки e-mail """
-MAILER_HOST 		= '176.58.108.53'
+MAILER_HOST 		= '127.0.0.1'
 MAILER_FROM 		= "abcd@efgh.com"
 MAILER_TO				= "ijkl@mnop.com"
 MAILER_SUBJECT 	= "Dashboard master crashed"
