@@ -65,19 +65,19 @@ class DashboardMaster(object):
 
 	def run(self):		
 		run_start = current_milli_time()	
-		self.print_message("Dashboard Updater Started at %s" % time.ctime())
+		self.print_message("Dashboard Updater Started at %s, now filling cheques..." % time.ctime())
 
 		# Заполняем (или обновляем) собственную таблицу чеков
 		if self.client[self.db_name][DASHBOARD_CHEQUES_COLLECTION].count() == 0 or FORCE_REFILL is True:
 			self.fill_cheques()
 		else:
 			self.update_cheques()
-		self.print_message("Took %s ms to fill cheques" % (current_milli_time() - run_start,))
+		self.print_message("Took %s ms to fill cheques, now splitting keys..." % (current_milli_time() - run_start,))
 
 		# Разбиваем коллекцию на блоки
 		t_start = current_milli_time()	
 		self.split_keys()
-		self.print_message("Took %s ms to split keys" % (current_milli_time() - t_start,))
+		self.print_message("Took %s ms to split keys, now getting POSTGRESQL data..." % (current_milli_time() - t_start,))
 
 		# При необходимости удаляем накопленные за прошлые запуски данные
 		if CLEAR_AGGREGATED_DATA is True:
@@ -91,19 +91,21 @@ class DashboardMaster(object):
 
 		# Вычисляем и сохраняем в отдельные коллекции продажи за 8 недель, а также 
 		# доли повторных покупок и доли клиентов по числу покупок
+		t_start = current_milli_time()
 		self.run_aggregators()
+		self.print_message("Took %s ms to aggregate mongo data, now calculating admin dashboard..." % (current_milli_time() - t_start,))
 
 		# Вычисление дэшборда для администраторов
 		t_start = current_milli_time()	
 		self.calculate_admin_dashboard()
-		self.print_message("Took %s ms to calculate admin dashboard" % (current_milli_time() - t_start,))
+		self.print_message("Took %s ms to calculate admin dashboard, now calculating brands and shops dashboards..." % (current_milli_time() - t_start,))
 
 		self.cur.execute(""" SELECT id FROM company""")
 		brands = self.cur.fetchall()
 		for brand_tuple in brands:
 			t_start = current_milli_time()	
 			self.calculate_brand_dashboard(brand_tuple[0])
-			self.print_message("Took %s ms to calculate dashboard for brand %s" % (current_milli_time() - t_start, brand_tuple[0]))
+			self.print_message("Took %s ms to calculate dashboard for brand %s, now calculating shops dashboards..." % (current_milli_time() - t_start, brand_tuple[0]))
 			
 			self.cur.execute(""" SELECT id FROM shop WHERE company_id = %s """, (brand_tuple[0], ))
 			shops = self.cur.fetchall()
