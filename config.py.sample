@@ -13,6 +13,11 @@ DASHBOARD_COLLECTION = 'py_dashboard'
 
 """ Имя коллекции с чеками """
 DASHBOARD_CHEQUES_COLLECTION = 'dashboard_cheques'
+
+""" 
+Совершать полный пересчет всех чеков 
+Если указано False, будут пересчитаны только чеки за последние 30 дней) 
+"""
 FORCE_REFILL = False
 
 """ Имя коллекции для накопления данных по расчету показателей """
