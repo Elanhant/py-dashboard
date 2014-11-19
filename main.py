@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import traceback
+import traceback, os, sys
 import smtplib
 from master import DashboardMaster
 from config import MAILER_HOST, MAILER_TO, MAILER_FROM, MAILER_SUBJECT, LOG_FILE_NAME
 
 if __name__ == '__main__':
-	f = open(LOG_FILE_NAME, 'w+')
+	log_path = os.path.join(sys.path[0], LOG_FILE_NAME)
+	f = open(log_path, 'w+')
 	f.write('Starting dashboard master...   ')
 	try:
 		dashboard_master = DashboardMaster(log=f)
