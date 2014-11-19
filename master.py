@@ -157,6 +157,8 @@ class DashboardMaster(object):
 			SUM(CASE WHEN t.date_create >= %s THEN 1 ELSE 0 END) as month,
 			SUM(CASE WHEN t.date_create >= %s THEN 1 ELSE 0 END) as week,
 			SUM(CASE WHEN t.date_create >= %s THEN 1 ELSE 0 END) as day,
+			SUM(CASE WHEN c.fullness = 0 THEN 1 ELSE 0 END)::FLOAT AS not_filled, 
+			SUM(CASE WHEN c.fullness = 1 THEN 1 ELSE 0 END)::FLOAT AS partially_filled, 
 			SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT AS filled, 
 			COUNT(c.fullness) as profiles,
 			COUNT(t.id) as total,
@@ -634,6 +636,17 @@ class DashboardMaster(object):
 			}
 			}).count()
 		dashboard_data['last_day_customers'] = 0 if not data else data
+
+
+		""" Соотношение заполненных анкет """
+		total = sum([d['total'] for d in brand_cards_data])
+		percents = {
+			'not_filled': 			0 if total == 0 else 100.0 * sum([d['not_filled'] for d in brand_cards_data]) / total,
+			'partially_filled': 0 if total == 0 else 100.0 * sum([d['partially_filled'] for d in brand_cards_data]) / total,
+			'filled': 					0 if total == 0 else 100.0 * sum([d['filled'] for d in brand_cards_data]) / total,
+		}
+
+		dashboard_data['filled_data'] = percents
 
 
 		self.update_dashboard({"brand_id": brand_id}, dashboard_data)
