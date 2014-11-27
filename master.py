@@ -41,6 +41,8 @@ class DashboardMaster(object):
 
 		self.splitted_keys = None
 
+		self.brands_groups = []
+
 		self.cards_data 								= []
 		self.genders_data								= []
 		self.brands_cards_added					= []
@@ -95,13 +97,23 @@ class DashboardMaster(object):
 		self.run_aggregators()
 		self.print_message("Took %s ms to aggregate mongo data, now calculating admin dashboard..." % (current_milli_time() - t_start,))
 
+		# Делаем выборку с ID несвязанных брендов
+		self.cur.execute(""" SELECT id, company_group_id FROM company WHERE name NOT ILIKE '%test%'""")
+		brands = self.cur.fetchall()
+		seen_groups = {}
+		for brand_tuple in brands:
+			if brand_tuple[1] == 0:
+				self.brands_groups.append(brand_tuple[0])
+			else:
+				seen_groups[brand_tuple[1]] = brand_tuple[0]
+		self.brands_groups += seen_groups.values()
+
 		# Вычисление дэшборда для администраторов
 		t_start = current_milli_time()	
 		self.calculate_admin_dashboard()
 		self.print_message("Took %s ms to calculate admin dashboard, now calculating brands and shops dashboards..." % (current_milli_time() - t_start,))
 
-		self.cur.execute(""" SELECT id FROM company""")
-		brands = self.cur.fetchall()
+		# Вычисление дэшбордов для брендов и магазинов
 		for brand_tuple in brands:
 			t_start = current_milli_time()	
 			self.calculate_brand_dashboard(brand_tuple[0])
@@ -401,7 +413,7 @@ class DashboardMaster(object):
 
 
 		""" Клиентская база """
-		total = sum([data['total'] for data in self.cards_data])
+		total = sum([data['total'] for data in self.cards_data if data['company_id'] in self.brands_groups])
 		dashboard_data['participants_count'] = total
 
 
