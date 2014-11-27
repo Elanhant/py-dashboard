@@ -98,7 +98,7 @@ class DashboardMaster(object):
 		self.print_message("Took %s ms to aggregate mongo data, now calculating admin dashboard..." % (current_milli_time() - t_start,))
 
 		# Делаем выборку с ID несвязанных брендов
-		self.cur.execute(""" SELECT id, company_group_id FROM company WHERE name NOT ILIKE '%test%'""")
+		self.cur.execute(""" SELECT id, company_group_id FROM company""")
 		brands = self.cur.fetchall()
 		seen_groups = {}
 		for brand_tuple in brands:
