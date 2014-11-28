@@ -440,9 +440,9 @@ class DashboardMaster(object):
 
 		""" Продажи за последние 8 недель """
 		data 			= []
-		no_sales 	= {'has_card': 0, 'no_card': 0, 'overall': 0}
 		for w in range(8):
 			start 		= self.today - timedelta(days=self.today.weekday(), weeks=w)
+			label 		= 'Неделя ' + str(start.isocalendar()[1])
 			week_data = self.client[self.db_name][WEEKS_SALES_COLLECTION_PREFIX + str(w)].aggregate([
 				{			
 			    '$group': {
@@ -457,10 +457,11 @@ class DashboardMaster(object):
 		    		'has_card': 1, 
 		    		'no_card': 	1, 
 		    		'overall': 	1,
-						'label':  	{'$literal': 'Неделя ' + str(start.isocalendar()[1])}
+						'label':  	{'$literal': label}
 			    }
 				}
 			])
+			no_sales 	= {'has_card': 0, 'no_card': 0, 'overall': 0, 'label': label}
 			data.append(no_sales if not week_data['result'] else week_data['result'][0])
 		data.reverse()
 		dashboard_data['sales_data'] = data
@@ -596,9 +597,9 @@ class DashboardMaster(object):
 
 		""" Продажи за последние 8 недель """
 		data 			= []
-		no_sales 	= {'has_card': 0, 'no_card': 0, 'overall': 0}
 		for w in range(8):
 			start 		= self.today - timedelta(days=self.today.weekday(), weeks=w)
+			label 		= 'Неделя ' + str(start.isocalendar()[1])
 			week_data = self.client[self.db_name][WEEKS_SALES_COLLECTION_PREFIX + str(w)].aggregate([
 				{
 					'$match': {'_id.brand_id': brand_id}
@@ -616,10 +617,11 @@ class DashboardMaster(object):
 		    		'has_card': 1, 
 		    		'no_card': 	1, 
 		    		'overall': 	1,
-						'label':  	{'$literal': 'Неделя ' + str(start.isocalendar()[1])}
+						'label':  	{'$literal': label}
 			    }
 				}
 			])
+			no_sales 	= {'has_card': 0, 'no_card': 0, 'overall': 0, 'label': label}
 			data.append(no_sales if not week_data['result'] else week_data['result'][0])
 		data.reverse()
 		dashboard_data['sales_data'] = data
@@ -771,10 +773,11 @@ class DashboardMaster(object):
 
 		""" Продажи за последние 8 недель """
 		data = []
-		no_sales = {'has_card': 0, 'no_card': 0, 'overall': 0}
 		for w in range(8):
 			start 		= self.today - timedelta(days=self.today.weekday(), weeks=w)
+			label 		= 'Неделя ' + str(start.isocalendar()[1])
 			week_data = self.client[self.db_name][WEEKS_SALES_COLLECTION_PREFIX + str(w)].find_one({'_id.shop_id': shop_id})
+			no_sales 	= {'has_card': 0, 'no_card': 0, 'overall': 0, 'label': label}
 			week_data = no_sales if not week_data else week_data
 			week_data['label'] = 'Неделя ' + str(start.isocalendar()[1])
 			data.append(week_data)
