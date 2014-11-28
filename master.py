@@ -149,6 +149,7 @@ class DashboardMaster(object):
 			FROM personal_data p 
 			JOIN customer cst ON cst.digital_id = p.digital_id 
 			JOIN card c ON c.customer_id = cst.id
+			WHERE c.company_id != 5
 			GROUP BY c.shop_id, c.company_id""")
 		self.genders_data = self.cur.fetchall()
 		self.print_message("Took %s ms to get genders data from POSTGRESQL DB" % (current_milli_time() - t_start, ))
@@ -178,6 +179,7 @@ class DashboardMaster(object):
 			t.shop_id
 			FROM card t JOIN customer c 
 			ON t.customer_id = c.id 
+			WHERE t.company_id != 5
 			GROUP BY t.company_id, t.shop_id """, (self.month_start_ts, self.week_start_ts, self.yesterday_ts))
 		self.cards_data = self.cur.fetchall()
 		self.print_message("Took %s ms to get cards data from POSTGRESQL DB" % (current_milli_time() - t_start, ))
@@ -344,15 +346,15 @@ class DashboardMaster(object):
 
 
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
-		total 		= sum([data['total'] for data in self.cards_data])
+		total 		= sum([data['total'] for data in self.cards_data if data['company_id'] != 5])
 		percents	= {
 			'channels': {
-				'all': 			0 if total == 0 else 100.0 * sum([data['all'] for data in self.cards_data]) / total,
-				'email': 		0 if total == 0 else 100.0 * sum([data['email'] for data in self.cards_data]) / total,
-				'sms': 			0 if total == 0 else 100.0 * sum([data['sms'] for data in self.cards_data]) / total,
-				'unknown': 	0 if total == 0 else 100.0 * sum([data['unknown'] for data in self.cards_data]) / total,
+				'all': 			0 if total == 0 else 100.0 * sum([data['all'] for data in self.cards_data if data['company_id'] != 5]) / total,
+				'email': 		0 if total == 0 else 100.0 * sum([data['email'] for data in self.cards_data if data['company_id'] != 5]) / total,
+				'sms': 			0 if total == 0 else 100.0 * sum([data['sms'] for data in self.cards_data if data['company_id'] != 5]) / total,
+				'unknown': 	0 if total == 0 else 100.0 * sum([data['unknown'] for data in self.cards_data if data['company_id'] != 5]) / total,
 			},
-			'subscribed': 0 if total == 0 else 100.0 * sum([data['subscribed'] for data in self.cards_data]) / total,
+			'subscribed': 0 if total == 0 else 100.0 * sum([data['subscribed'] for data in self.cards_data if data['company_id'] != 5]) / total,
 		}
 
 		dashboard_data['channels_data'] = percents['channels']
@@ -402,18 +404,18 @@ class DashboardMaster(object):
 
 
 		""" Соотношение полов """
-		total 		= sum([data['total'] for data in self.genders_data])
+		total 		= sum([data['total'] for data in self.genders_data if data['company_id'] != 5])
 		percents	= {
-			'male': 			0 if total == 0 else 100.0 * sum([data['male'] for data in self.genders_data]) / total,
-			'female': 		0 if total == 0 else 100.0 * sum([data['female'] for data in self.genders_data]) / total,
-			'undefined': 	0 if total == 0 else 100.0 * sum([data['undefined'] for data in self.genders_data]) / total,
+			'male': 			0 if total == 0 else 100.0 * sum([data['male'] for data in self.genders_data if data['company_id'] != 5]) / total,
+			'female': 		0 if total == 0 else 100.0 * sum([data['female'] for data in self.genders_data if data['company_id'] != 5]) / total,
+			'undefined': 	0 if total == 0 else 100.0 * sum([data['undefined'] for data in self.genders_data if data['company_id'] != 5]) / total,
 		}
 
 		dashboard_data['genders_data'] = percents
 
 
 		""" Клиентская база """
-		total = sum([data['total'] for data in self.cards_data if data['company_id'] in self.brands_groups])
+		total = sum([data['total'] for data in self.cards_data if data['company_id'] in self.brands_groups and data['company_id'] != 5])
 		dashboard_data['participants_count'] = total
 
 
@@ -444,6 +446,11 @@ class DashboardMaster(object):
 		for w in range(8):
 			start 		= self.today - timedelta(days=self.today.weekday(), weeks=w)
 			week_data = self.client[self.db_name][WEEKS_SALES_COLLECTION_PREFIX + str(w)].aggregate([
+				{
+					'$match': {
+						'brand_id': {'$ne': 5}
+					}
+				},
 				{			
 			    '$group': {
 			      '_id': 			None,
@@ -468,11 +475,11 @@ class DashboardMaster(object):
 
 		""" Число участников в разрезе брендов """
 		percents 		= {}
-		self.cur.execute(""" SELECT id as company_id, name FROM company """)
+		self.cur.execute(""" SELECT id as company_id, name FROM company WHERE id != 5 """)
 		brands_names = self.cur.fetchall()
-		total = sum([pair['total'] for pair in self.cards_data])
+		total = sum([pair['total'] for pair in self.cards_data if pair['company_id'] != 5])
 		for brand in brands_names:			
-			percents[brand['name']] = 0 if total == 0 else 100.0 * sum([d['total'] for d in self.cards_data if d['company_id'] == brand['company_id']]) / total
+			percents[brand['name']] = 0 if total == 0 else 100.0 * sum([d['total'] for d in self.cards_data if d['company_id'] == brand['company_id'] and d['company_id'] != 5]) / total
 		dashboard_data['participants_by_brands'] = percents
 
 

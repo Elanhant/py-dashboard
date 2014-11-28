@@ -14,7 +14,7 @@ class AdminRePurchases(DashboardProcessor):
 		super(AdminRePurchases,self).__init__(map_key_name, start_ts, end_ts)
 		self.name 		= 'admin_repurchases'
 		self.pipeline = [
-				{"$match": {"card_number": {"$ne": ''}, "date": {"$gte": start_ts}}},
+				{"$match": {"card_number": {"$ne": ''}, "date": {"$gte": start_ts}, 'brand_id': {'$ne': 5}}},
 				{"$group": {
 						"_id": '$card_number',
 						"diff": {"$first": {"$subtract": ['$sum', '$return_sum']}},
@@ -46,7 +46,7 @@ class AdminRePurchasesTotals(DashboardProcessor):
 		super(AdminRePurchasesTotals,self).__init__(map_key_name, start_ts, end_ts)
 		self.name 		= 'admin_repurchases_totals'
 		self.pipeline = [
-				{"$match": {"card_number": {"$ne": ''}, "date": {"$gte": start_ts}}},
+				{"$match": {"card_number": {"$ne": ''}, "date": {"$gte": start_ts}, 'brand_id': {'$ne': 5}}},
 				{"$group": {
 						"_id": None,
 						"has_card": {"$sum": {"$cond": [{'$eq': ['$card_number', '']}, 0, {'$subtract': ['$sum', '$return_sum']}]}},
@@ -75,7 +75,7 @@ class AdminCustomersByPurchases(DashboardProcessor):
 		super(AdminCustomersByPurchases,self).__init__(map_key_name, start_ts, end_ts)
 		self.name 		= 'admin_customers_by_purchases'
 		self.pipeline = [
-	    {"$match": {"card_number": {"$ne": ''}}},
+	    {"$match": {"card_number": {"$ne": ''},	'brand_id': {'$ne': 5}}},
 	    {"$group": {
 	        "_id": { "brand_id": '$brand_id', "card_number": '$card_number' },
 	        "card_number": { "$first": '$card_number' },

@@ -18,7 +18,7 @@ class CustomersByPurchasesUpdater(Updater):
 		processor = AdminCustomersByPurchases('card_number')	
 		processor.run(self.split_keys)
 		result = processor.result
-		self.cur.execute(""" SELECT (SELECT COUNT('id') FROM card) + (SELECT COUNT('id') FROM online_data) """)
+		self.cur.execute(""" SELECT (SELECT COUNT('id') FROM card WHERE company_id != 5) + (SELECT COUNT('id') FROM online_data WHERE company_id != 5) """)
 		customers_count = self.cur.fetchone()[0]
 		self.update_aggregated_data(result, customers_count)
 		return result
@@ -27,7 +27,7 @@ class CustomersByPurchasesUpdater(Updater):
 		processor = AdminCustomersByPurchases('card_number', start_ts=today_ts, end_ts=yesterday_ts)
 		processor.run(self.split_keys)
 		result = processor.result	
-		self.cur.execute(""" SELECT COUNT('id') FROM card WHERE date_create >= %s """, (yesterday_ts,))
+		self.cur.execute(""" SELECT COUNT('id') FROM card WHERE date_create >= %s AND company_id != 5""", (yesterday_ts,))
 		customers_count = self.cur.fetchone()[0]
 		for k in self.aggregated_data['numerator']:
 			try:
@@ -220,22 +220,26 @@ class PurchasesWithCardsUpdater(Updater):
 		
 	def calculate_total_data(self):
 		denominator = self.db['dashboard_cheques'].find({
-			'date': {'$gte': self.start_ts, '$lt': self.end_ts}
+			'date': {'$gte': self.start_ts, '$lt': self.end_ts},
+			'brand_id': {'$ne': 5}
 			}).count()
 		numerator 	= self.db['dashboard_cheques'].find({
 			'date': {'$gte': self.start_ts, '$lt': self.end_ts},
-			'card_number': {'$ne': ''}
+			'card_number': {'$ne': ''},
+			'brand_id': {'$ne': 5}
 			}).count()
 		self.update_aggregated_data(numerator, denominator)
 		return {'numerator': numerator, 'denominator': denominator}
 
 	def calculate_day_data(self, today_ts, yesterday_ts):
 		denominator = self.db['dashboard_cheques'].find({
-			'date': {'$gte': yesterday_ts, '$lt': today_ts}
+			'date': {'$gte': yesterday_ts, '$lt': today_ts},
+			'brand_id': {'$ne': 5}
 			}).count()
 		numerator 	= self.db['dashboard_cheques'].find({
 			'date': {'$gte': yesterday_ts, '$lt': today_ts},
-			'card_number': {'$ne': ''}
+			'card_number': {'$ne': ''},
+			'brand_id': {'$ne': 5}
 			}).count()
 		self.update_aggregated_data(numerator + self.aggregated_data['numerator'], denominator + self.aggregated_data['denominator'])
 		return {'numerator': self.aggregated_data['numerator'], 'denominator': self.aggregated_data['denominator']}
@@ -311,7 +315,8 @@ class BonusesUpdater(Updater):
 		result = self.db['dashboard_cheques'].aggregate([
 			{
 				'$match': {
-					'date': {'$gte': self.start_ts}
+					'date': {'$gte': self.start_ts},
+					'brand_id': {'$ne': 5}
 				}
 			},
 			{
@@ -329,7 +334,8 @@ class BonusesUpdater(Updater):
 		result = self.db['dashboard_cheques'].aggregate([
 			{
 				'$match': {
-					'date': {'$gte': self.start_ts}
+					'date': {'$gte': self.start_ts},
+					'brand_id': {'$ne': 5}
 				}
 			},
 			{
@@ -347,7 +353,8 @@ class BonusesUpdater(Updater):
 		result = self.db['dashboard_cheques'].aggregate([
 			{
 				'$match': {
-					'date': {'$gte': yesterday_ts}
+					'date': {'$gte': yesterday_ts},
+					'brand_id': {'$ne': 5}
 				}
 			},
 			{
@@ -365,7 +372,8 @@ class BonusesUpdater(Updater):
 		result = self.db['dashboard_cheques'].aggregate([
 			{
 				'$match': {
-					'date': {'$gte': yesterday_ts}
+					'date': {'$gte': yesterday_ts},
+					'brand_id': {'$ne': 5}
 				}
 			},
 			{
