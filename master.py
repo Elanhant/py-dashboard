@@ -469,11 +469,12 @@ class DashboardMaster(object):
 
 		""" Число участников в разрезе брендов """
 		percents 		= {}
-		self.cur.execute(""" SELECT id as company_id, name FROM company """)
+		self.cur.execute(""" SELECT t.id as company_id, t.name as name, t.company_group_id as cg_id, cg.name as cg_name FROM company t LEFT JOIN company_group cg ON cg.id = t.company_group_id """)
 		brands_names = self.cur.fetchall()
-		total = sum([pair['total'] for pair in self.cards_data])
+		total = sum([pair['total'] for pair in self.cards_data if pair['company_id'] in self.brands_groups])
 		for brand in brands_names:			
-			percents[brand['name']] = 0 if total == 0 else 100.0 * sum([d['total'] for d in self.cards_data if d['company_id'] == brand['company_id']]) / total
+			key = brand['name'] if brand['cg_id'] == 0 else brand['cg_name']
+			percents[key] = 0 if total == 0 else 100.0 * sum([d['total'] for d in self.cards_data if d['company_id'] == brand['company_id'] and d['company_id'] in self.brands_groups]) / total
 		dashboard_data['participants_by_brands'] = percents
 
 
