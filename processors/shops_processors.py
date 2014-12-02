@@ -193,4 +193,5 @@ class ChequesPerPeriodProcessor(DashboardProcessor):
 
 	def save_data(self, data):
 		self.db[self.target_collection].drop()
-		self.db[self.target_collection].insert(data)
+		if data
+			self.db[self.target_collection].insert(data)
