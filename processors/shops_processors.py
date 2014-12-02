@@ -55,7 +55,8 @@ class CustomersByPurchases(DashboardProcessor):
 
 	def save_data(self, data):
 		self.db[self.target_collection].drop()
-		self.db[self.target_collection].insert(data)
+		if data:
+			self.db[self.target_collection].insert(data)
 
 
 class RePurchasesMonth(DashboardProcessor):
@@ -99,7 +100,8 @@ class RePurchasesMonth(DashboardProcessor):
 
 	def save_data(self, data):
 		self.db[self.target_collection].drop()
-		self.db[self.target_collection].insert(data)
+		if data:
+			self.db[self.target_collection].insert(data)
 
 
 class RePurchasesMonthTotals(DashboardProcessor):
@@ -141,7 +143,8 @@ class RePurchasesMonthTotals(DashboardProcessor):
 
 	def save_data(self, data):
 		self.db[self.target_collection].drop()
-		self.db[self.target_collection].insert(data)
+		if data:
+			self.db[self.target_collection].insert(data)
 
 
 class ChequesPerPeriodProcessor(DashboardProcessor):
