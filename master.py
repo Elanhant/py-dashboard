@@ -178,6 +178,7 @@ class DashboardMaster(object):
 			t.shop_id
 			FROM card t JOIN customer c 
 			ON t.customer_id = c.id 
+			WHERE t.status = 1
 			GROUP BY t.company_id, t.shop_id """, (self.month_start_ts, self.week_start_ts, self.yesterday_ts))
 		self.cards_data = self.cur.fetchall()
 		self.print_message("Took %s ms to get cards data from POSTGRESQL DB" % (current_milli_time() - t_start, ))
