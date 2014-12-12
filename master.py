@@ -173,11 +173,12 @@ class DashboardMaster(object):
 			SUM(CASE WHEN c.fullness = 1 THEN 1 ELSE 0 END)::FLOAT AS partially_filled, 
 			SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT AS filled, 
 			COUNT(c.fullness) as profiles,
-			COUNT(t.id) as total,
+			SUM(CASE WHEN sh.company_id = t.company_id THEN 1 ELSE 0 END) as total,
 			t.company_id,
 			t.shop_id
 			FROM card t JOIN customer c 
 			ON t.customer_id = c.id 
+			JOIN shop sh ON sh.id = t.shop_id
 			WHERE t.status = 1
 			GROUP BY t.company_id, t.shop_id """, (self.month_start_ts, self.week_start_ts, self.yesterday_ts))
 		self.cards_data = self.cur.fetchall()
