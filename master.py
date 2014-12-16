@@ -415,7 +415,7 @@ class DashboardMaster(object):
 
 
 		""" Клиентская база """
-		total = sum([data['total'] for data in self.cards_data if data['company_id'] in self.brands_groups])
+		total = sum([data['total'] for data in self.cards_data])
 		dashboard_data['participants_count'] = total
 
 
