@@ -42,6 +42,7 @@ class DashboardMaster(object):
 		self.splitted_keys = None
 
 		self.brands_groups = []
+		self.cards_by_purchases = []
 
 		self.cards_data 								= []
 		self.genders_data								= []
@@ -90,6 +91,9 @@ class DashboardMaster(object):
 
 		# Получаем данные из Postgresql-базы, сгрупированные по ID бренда
 		self.get_brands_postgre_data()
+
+		# Получаем данные количества клиентов по числу покупок из Postgresql-базы, сгрупированные по ID магазина
+		self.get_cards_by_purchases()
 
 		# Вычисляем и сохраняем в отдельные коллекции продажи за 8 недель, а также 
 		# доли повторных покупок и доли клиентов по числу покупок
@@ -185,6 +189,26 @@ class DashboardMaster(object):
 		self.print_message("Took %s ms to get cards data from POSTGRESQL DB" % (current_milli_time() - t_start, ))
 
 
+	def get_cards_by_purchases(self):
+		t_start = current_milli_time()
+		self.cur.execute(""" SELECT 
+				SUM(CASE WHEN purchases = 1 THEN 1 ELSE 0 END) as qty_1,
+				SUM(CASE WHEN purchases = 2 THEN 1 ELSE 0 END) as qty_2,
+				SUM(CASE WHEN purchases >= 3 THEN 1 ELSE 0 END) as qty_3,
+				a.shop_id,
+				MIN(a.company_id) as company_id
+			FROM (
+				SELECT t.shop_id, t.company_id, t.id, COUNT(op.id) as purchases 
+				FROM card t 
+				JOIN shop sh ON t.shop_id = sh.id AND t.company_id = sh.company_id 
+				JOIN operation op ON op.account_id = t.account_id AND op.type IN (1, 2) 
+				GROUP BY t.shop_id, t.id
+			) a 
+			GROUP BY a.shop_id """)
+		self.cards_by_purchases = self.cur.fetchall()
+		self.print_message("Took %s ms to get cards by purchases from POSTGRESQL DB" % (current_milli_time() - t_start, ))
+
+
 	def run_aggregators(self):
 		""" Продажи за 8 недель """
 		sales_updater = admin_updaters.SalesUpdater()
@@ -193,14 +217,6 @@ class DashboardMaster(object):
 		""" Число чеков за месяц, неделю и вчера """
 		cheques_per_period_updater = shops_updaters.ChequesPerPeriod()
 		cheques_per_period_updater.run()
-
-		""" Доли клиентов с определенным числом покупок (для магазинов) """
-		customers_by_purchases_updater = shops_updaters.CustomersByPurchasesUpdater(split_keys=self.splitted_keys)
-		customers_by_purchases_updater.run()
-
-		""" Доли клиентов с определенным числом покупок (для брендов) """
-		customers_by_purchases_updater = brands_updaters.CustomersByPurchasesUpdater(split_keys=self.splitted_keys)
-		customers_by_purchases_updater.run()
 
 		""" Доли повторных покупок (для магазинов) """
 		re_purchases_updater = shops_updaters.RePurchasesMonthUpdater(split_keys=self.splitted_keys)
@@ -362,10 +378,7 @@ class DashboardMaster(object):
 
 
 		""" Доли клиентов с определенным числом покупок """
-		customers_by_purchases_updater = admin_updaters.CustomersByPurchasesUpdater(split_keys=self.splitted_keys)
-		customers_by_purchases_updater.run()
-
-		aggregated = customers_by_purchases_updater.find_aggregated_data()
+		total = sum([data['total'] for data in self.cards_data])
 		cards_with_cheques = 0
 		percents = {
 			'qty_0': {
@@ -374,22 +387,20 @@ class DashboardMaster(object):
 			},
 			'qty_1': {
 				'label': 'Клиентов с 1 покупкой',
-				'value': 0
+				'value': sum([data['qty_1'] for data in self.cards_by_purchases])
 			},
 			'qty_2': {
 				'label': 'Клиентов с 2 покупками',
-				'value': 0
+				'value': sum([data['qty_2'] for data in self.cards_by_purchases])
 			},
 			'qty_3': {
 				'label': 'Клиентов с 3 и более покупками',
-				'value': 0
+				'value': sum([data['qty_3'] for data in self.cards_by_purchases])
 			},
 		}
-		for x in aggregated['numerator']:
-			cards_with_cheques += aggregated['numerator'][x]
-			percents['qty_' + str(x)]['value'] = 0 if aggregated['denominator'] == 0 else 100.0 * aggregated['numerator'][x] / aggregated['denominator']
-		no_cheques = aggregated['denominator'] - cards_with_cheques
-		percents['qty_0']['value'] = 0 if aggregated['denominator'] == 0 else 100.0 * no_cheques / aggregated['denominator']
+		percents['qty_0']['value'] = total - percents['qty_1']['value'] - percents['qty_2']['value'] - percents['qty_3']['value']
+		for key in percents:
+			percents[key]['value'] = 0 if total == 0 else 100.0 * percents[key]['value'] / total
 		dashboard_data['progress_data'] = percents
 
 
@@ -490,6 +501,7 @@ class DashboardMaster(object):
 
 		brand_cards_data 		= [d for d in self.cards_data if d['company_id'] == brand_id]
 		brand_genders_data 	= [d for d in self.genders_data if d['company_id'] == brand_id]
+		brand_cards_by_purchases = [d for d in self.cards_by_purchases if d['company_id'] == brand_id]
 
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
 		total = sum([d['total'] for d in brand_cards_data])
@@ -507,8 +519,7 @@ class DashboardMaster(object):
 
 
 		""" Доли клиентов с определенным числом покупок """
-		aggregated = self.client[self.db_name][AGGREGATED_CARDS_BY_PURCHASES_BRANDS].find_one({'brand_id': brand_id})
-		cards_with_cheques = 0
+		total = sum([d['total'] for d in brand_cards_data])
 		percents = {
 			'qty_0': {
 				'label': 'Клиентов без покупок',
@@ -516,24 +527,20 @@ class DashboardMaster(object):
 			},
 			'qty_1': {
 				'label': 'Клиентов с 1 покупкой',
-				'value': 0
+				'value': sum([data['qty_1'] for data in brand_cards_by_purchases])
 			},
 			'qty_2': {
 				'label': 'Клиентов с 2 покупками',
-				'value': 0
+				'value': sum([data['qty_2'] for data in brand_cards_by_purchases])
 			},
 			'qty_3': {
 				'label': 'Клиентов с 3 и более покупками',
-				'value': 0
+				'value': sum([data['qty_3'] for data in brand_cards_by_purchases])
 			},
 		}
-		if aggregated is not None:
-			total = sum([d['total'] for d in brand_cards_data])
-			for key in ['qty_1', 'qty_2', 'qty_3']:
-				cards_with_cheques += aggregated[key]
-				percents[key]['value'] = 0 if total == 0 else 100.0 * aggregated[key] / total
-			no_cheques = total - cards_with_cheques
-			percents['qty_0']['value'] = 0 if total == 0 else 100.0 * no_cheques / total
+		percents['qty_0']['value'] = total - percents['qty_1']['value'] - percents['qty_2']['value'] - percents['qty_3']['value']
+		for key in percents:
+			percents[key]['value'] = 0 if total == 0 else 100.0 * percents[key]['value'] / total
 		dashboard_data['progress_data'] = percents
 
 
@@ -677,6 +684,7 @@ class DashboardMaster(object):
 
 		shop_cards_data 	= [d for d in self.cards_data if d['shop_id'] == shop_id]
 		shop_genders_data = [d for d in self.genders_data if d['shop_id'] == shop_id]
+		shop_cards_by_purchases = [d for d in self.cards_by_purchases if d['shop_id'] == shop_id]
 
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
 		total = sum([d['total'] for d in shop_cards_data])
@@ -694,8 +702,7 @@ class DashboardMaster(object):
 
 
 		""" Доли клиентов с определенным числом покупок """
-		aggregated = self.client[self.db_name][AGGREGATED_CARDS_BY_PURCHASES_SHOPS].find_one({'shop_id': shop_id})
-		cards_with_cheques = 0
+		total = sum([d['total'] for d in shop_cards_data])
 		percents = {
 			'qty_0': {
 				'label': 'Клиентов без покупок',
@@ -703,25 +710,20 @@ class DashboardMaster(object):
 			},
 			'qty_1': {
 				'label': 'Клиентов с 1 покупкой',
-				'value': 0
+				'value': sum([data['qty_1'] for data in shop_cards_by_purchases])
 			},
 			'qty_2': {
 				'label': 'Клиентов с 2 покупками',
-				'value': 0
+				'value': sum([data['qty_2'] for data in shop_cards_by_purchases])
 			},
 			'qty_3': {
 				'label': 'Клиентов с 3 и более покупками',
-				'value': 0
+				'value': sum([data['qty_3'] for data in shop_cards_by_purchases])
 			},
 		}
-		if aggregated is not None:
-			total = sum([d['total'] for d in shop_cards_data])
-			for key in ['qty_1', 'qty_2', 'qty_3']:
-				cards_with_cheques += aggregated[key]
-				percents[key]['value'] = 0 if total == 0 else 100.0 * aggregated[key] / total
-			no_cheques = total - cards_with_cheques			
-			percents['qty_0']['value'] = 0 if total == 0 else 100.0 * no_cheques / total
-
+		percents['qty_0']['value'] = total - percents['qty_1']['value'] - percents['qty_2']['value'] - percents['qty_3']['value']
+		for key in percents:
+			percents[key]['value'] = 0 if total == 0 else 100.0 * percents[key]['value'] / total
 		dashboard_data['progress_data'] = percents
 
 
