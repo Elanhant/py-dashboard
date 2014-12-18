@@ -202,6 +202,7 @@ class DashboardMaster(object):
 				FROM card t 
 				JOIN shop sh ON t.shop_id = sh.id AND t.company_id = sh.company_id 
 				JOIN operation op ON op.account_id = t.account_id AND op.type IN (1, 2) 
+				WHERE t.status = 1
 				GROUP BY t.shop_id, t.id
 			) a 
 			GROUP BY a.shop_id """)
