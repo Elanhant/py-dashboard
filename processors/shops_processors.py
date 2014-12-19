@@ -1,76 +1,13 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from processor import DashboardProcessor
-from config import AGGREGATED_CARDS_BY_PURCHASES_SHOPS, AGGREGATED_RE_PURCHASES_SHOPS, \
-	AGGREGATED_RE_PURCHASES_TOTALS_SHOPS, AGGREGATED_CHEQUES_PER_PERIOD
+from config import AGGREGATED_RE_PURCHASES_SHOPS, AGGREGATED_RE_PURCHASES_TOTALS_SHOPS, AGGREGATED_CHEQUES_PER_PERIOD
 from datetime import datetime, timedelta
 import time
 
 
-class CustomersByPurchases(DashboardProcessor):
-	""" """
-
-	def __init__(self, map_key_name, start_ts=None, end_ts=None):
-		super(CustomersByPurchases, self).__init__(map_key_name, start_ts, end_ts)
-		self.name = 'customers_by_purchases'
-		self.target_collection = AGGREGATED_CARDS_BY_PURCHASES_SHOPS
-		self.pipeline = [
-			{
-				"$match": {"card_number": {"$ne": ''}}
-			},
-			{
-				"$group": {
-					"_id": {"shop_id": "$shop_id", "card_number": '$card_number'},
-					"cheques": {"$sum": 1},
-				}
-			},
-			{
-				"$group": {
-					"_id": {
-						'qty': {"$cond": [{"$gte": ['$cheques', 3]}, 3, '$cheques']},
-						'shop_id': '$_id.shop_id'
-					},
-					"count": {"$sum": 1},
-				}
-			},
-			{
-				"$group": {
-					"_id": {
-						'shop_id': '$_id.shop_id'
-					},
-					"counts": {
-						"$addToSet": {"qty": "$_id.qty", "cards": "$count"}
-					}
-				}
-			}
-		]
-
-	def process_results(self):
-		result = {}
-		for collection_name in self.collections:
-			cursor = self.db[collection_name].find()
-			for data in cursor:
-				key = str(data['_id']['shop_id'])
-				try:
-					_ = result[key]
-				except KeyError:
-					result[key] = {
-						'_id': key,
-						'shop_id': data['_id']['shop_id'],
-						'qty_0': 0, 'qty_1': 0, 'qty_2': 0, 'qty_3': 0,
-					}
-				finally:
-					for q in data['counts']:
-						result[key]['qty_' + str(q['qty'])] += q['cards']
-		return result.values()
-
-	def save_data(self, data):
-		self.db[self.target_collection].drop()
-		if data:
-			self.db[self.target_collection].insert(data)
-
-
 class RePurchasesMonth(DashboardProcessor):
-	""" """
+	""" Сумма всех первых продаж """
 
 	def __init__(self, map_key_name, start_ts=None, end_ts=None):
 		super(RePurchasesMonth, self).__init__(map_key_name, start_ts, end_ts)
@@ -109,10 +46,10 @@ class RePurchasesMonth(DashboardProcessor):
 					result[key] = {
 						'_id': key,
 						'shop_id': data['_id'],
-						'not_firsts': 0
+						'firsts': 0
 					}
 				finally:
-					result[key]['not_firsts'] += data['result']
+					result[key]['firsts'] += data['result']
 		return result.values()
 
 	def save_data(self, data):
@@ -122,7 +59,7 @@ class RePurchasesMonth(DashboardProcessor):
 
 
 class RePurchasesMonthTotals(DashboardProcessor):
-	""" """
+	""" Сумма всех продаж по картам и без них """
 
 	def __init__(self, map_key_name, start_ts=None, end_ts=None):
 		super(RePurchasesMonthTotals, self).__init__(map_key_name, start_ts, end_ts)
@@ -170,7 +107,7 @@ class RePurchasesMonthTotals(DashboardProcessor):
 
 
 class ChequesPerPeriodProcessor(DashboardProcessor):
-	""" """
+	""" Число чеков за последние месяц, неделю и день """
 
 	def __init__(self, map_key_name, start_ts=None, end_ts=None):
 		super(ChequesPerPeriodProcessor, self).__init__(map_key_name, start_ts, end_ts)

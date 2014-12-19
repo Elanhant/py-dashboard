@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from updater import Updater
-from processors.shops_processors import CustomersByPurchases, RePurchasesMonth, RePurchasesMonthTotals, \
-	ChequesPerPeriodProcessor
+from processors.shops_processors import RePurchasesMonth, RePurchasesMonthTotals, ChequesPerPeriodProcessor
 from datetime import datetime, timedelta
 from config import DASHBOARD_CHEQUES_COLLECTION
 import time
@@ -44,24 +43,6 @@ class PurchasesWithCardsUpdater(Updater):
 		self.update_aggregated_data(numerator + self.aggregated_data['numerator'],
 		                            denominator + self.aggregated_data['denominator'])
 		return {'numerator': self.aggregated_data['numerator'], 'denominator': self.aggregated_data['denominator']}
-
-
-class CustomersByPurchasesUpdater(Updater):
-	""" Доли клиентов с определенным числом покупок """
-
-	def __init__(self, split_keys=None):
-		super(CustomersByPurchasesUpdater, self).__init__()
-		self.name = 'customers_by_purchases'
-		self.split_keys = split_keys
-
-	def calculate_total_data(self):
-		processor = CustomersByPurchases('card_number')
-		processor.run(self.split_keys)
-		result = processor.result
-		return result
-
-	def calculate_day_data(self, today_ts, yesterday_ts):
-		self.calculate_total_data()
 
 
 class RePurchasesMonthUpdater(Updater):

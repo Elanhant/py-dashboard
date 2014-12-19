@@ -1,15 +1,16 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from processor import DashboardProcessor
 from multiprocessing import Process
 from datetime import datetime, timedelta
 from config import WEEKS_SALES_COLLECTION_PREFIX
-import time, copy
+import time
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 
 class AdminRePurchases(DashboardProcessor):
-	""" """
+	""" Сумма всех первых продаж """
 
 	def __init__(self, map_key_name, start_ts=None, end_ts=None):
 		super(AdminRePurchases, self).__init__(map_key_name, start_ts, end_ts)
@@ -41,11 +42,11 @@ class AdminRePurchases(DashboardProcessor):
 			})
 			purchases = 0 if not q['result'] else q['result'][0]['sum']
 			result += purchases
-		return {"not_firsts": result}
+		return {"firsts": result}
 
 
 class AdminRePurchasesTotals(DashboardProcessor):
-	""" """
+	""" Сумма всех продаж по картам и без них """
 
 	def __init__(self, map_key_name, start_ts=None, end_ts=None):
 		super(AdminRePurchasesTotals, self).__init__(map_key_name, start_ts, end_ts)
@@ -78,55 +79,8 @@ class AdminRePurchasesTotals(DashboardProcessor):
 		return result
 
 
-class AdminCustomersByPurchases(DashboardProcessor):
-	""" """
-
-	def __init__(self, map_key_name, start_ts=None, end_ts=None):
-		super(AdminCustomersByPurchases, self).__init__(map_key_name, start_ts, end_ts)
-		self.name = 'admin_customers_by_purchases'
-		self.pipeline = [
-			{
-				"$match": {"card_number": {"$ne": ''}}
-			},
-			{
-				"$group": {
-					"_id": {"brand_id": '$brand_id', "card_number": '$card_number'},
-					"card_number": {"$first": '$card_number'},
-					"cheques": {"$sum": 1},
-					"last_ts": {"$max": "$date"}
-				}
-			},
-			{
-				"$group": {
-					"_id": {"$cond": [{"$gte": ['$cheques', 3]}, 3, '$cheques']},
-					"count": {"$sum": 1},
-					"last_ts": {"$max": "$last_ts"}
-				}
-			},
-		]
-
-	def process_results(self):
-		result = {}
-		for collection_name in self.collections:
-			q = self.db[collection_name].aggregate({
-				"$project": {
-					"cards": "$count"
-				}
-			})
-			purchases = q['result']
-			for data in purchases:
-				key = str(data['_id'])
-				try:
-					_ = result[key]
-				except KeyError:
-					result[key] = 0
-				finally:
-					result[key] += data['cards']
-		return result
-
-
 class AdminSalesEightWeeks(DashboardProcessor):
-	""" """
+	""" Продажи за последние 8 недель """
 
 	def __init__(self, map_key_name, start_ts=None, end_ts=None):
 		super(AdminSalesEightWeeks, self).__init__(map_key_name, start_ts, end_ts)
@@ -157,27 +111,21 @@ class AdminSalesEightWeeks(DashboardProcessor):
 		]
 
 	def run(self, split_keys=None):
-		if self.DEBUG:
-			print "===== Dashboard processor started at %s" % time.ctime()
+		self.debug_print("===== Dashboard processor started at %s" % time.ctime())
+
 		t_start = current_milli_time()
 		start = t_start
 		self.run_threads()
-		if self.DEBUG:
-			print "===== Running threads has taken %s ms to complete" % (current_milli_time() - t_start)
+		self.debug_print("===== Running threads has taken %s ms to complete" % (current_milli_time() - t_start))
+
 		t_start = current_milli_time()
-		if self.DEBUG:
-			print "===== Processing results has taken %s ms to complete" % (current_milli_time() - t_start)
+		self.debug_print("===== Processing results has taken %s ms to complete" % (current_milli_time() - t_start))
+
 		t_start = current_milli_time()
-		# self.drop_subset_collections()
-		if self.DEBUG:
-			print "===== Dropping subset collections has taken %s ms to complete" % (current_milli_time() - t_start)
-			print "===== Processing was completed in %s ms" % (current_milli_time() - start)
+		self.debug_print("===== Processing was completed in %s ms" % (current_milli_time() - start))
 
 	def run_threads(self):
-		t_start = current_milli_time()
 		today = datetime.today().replace(hour=0, minute=0, second=0)
-		week_start = today - timedelta(days=today.weekday(), weeks=7)
-		week_start_ts = int(time.mktime(week_start.timetuple()))
 
 		for i in range(2):
 			for w in range(self.NUM_THREADS):

@@ -373,7 +373,7 @@ class DashboardMaster(object):
 		aggregated = repurchases_updater.find_aggregated_data()
 		totals = sum(aggregated['denominator'].itervalues())
 		percent = 0 if totals == 0 else 100.0 * (
-		aggregated['denominator']['has_card'] - aggregated['numerator']['not_firsts']) / totals
+		aggregated['denominator']['has_card'] - aggregated['numerator']['firsts']) / totals
 		dashboard_data['re_purchases_year'] = percent
 
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
@@ -426,7 +426,7 @@ class DashboardMaster(object):
 		aggregated = repurchases_updater.find_aggregated_data()
 		totals = sum(aggregated['denominator'].itervalues())
 		percent = 0 if totals == 0 else 100.0 * (
-		aggregated['denominator']['has_card'] - aggregated['numerator']['not_firsts']) / totals
+		aggregated['denominator']['has_card'] - aggregated['numerator']['firsts']) / totals
 		dashboard_data['re_purchases_month'] = percent
 
 		""" Соотношение полов """
@@ -556,10 +556,10 @@ class DashboardMaster(object):
 		dashboard_data['progress_data'] = percents
 
 		""" Доля повторных покупок с начала месяца """
-		not_firsts = self.client[self.db_name][AGGREGATED_RE_PURCHASES_BRANDS].find_one({'brand_id': brand_id})
+		firsts = self.client[self.db_name][AGGREGATED_RE_PURCHASES_BRANDS].find_one({'brand_id': brand_id})
 		totals_data = self.client[self.db_name][AGGREGATED_RE_PURCHASES_TOTALS_BRANDS].find_one({'brand_id': brand_id})
 		total_sum = 0 if totals_data is None else totals_data['has_card'] + totals_data['no_card']
-		percent = 0 if total_sum == 0 else 100.0 * (totals_data['has_card'] - not_firsts['not_firsts']) / total_sum
+		percent = 0 if total_sum == 0 else 100.0 * (totals_data['has_card'] - firsts['firsts']) / total_sum
 		dashboard_data['re_purchases_month'] = percent
 
 		""" Доля заполненных анкет """
@@ -733,12 +733,12 @@ class DashboardMaster(object):
 		dashboard_data['progress_data'] = percents
 
 		""" Доля повторных покупок с начала месяца """
-		not_firsts = self.client[self.db_name][AGGREGATED_RE_PURCHASES_SHOPS].find_one({'shop_id': shop_id}) or {
-		'not_firsts': 0}
+		firsts = self.client[self.db_name][AGGREGATED_RE_PURCHASES_SHOPS].find_one({'shop_id': shop_id}) or {
+		'firsts': 0}
 		totals_data = self.client[self.db_name][AGGREGATED_RE_PURCHASES_TOTALS_SHOPS].find_one(
 			{'shop_id': shop_id}) or {'has_card': 0, 'no_card': 0}
 		total_sum = 0 if totals_data is None else totals_data['has_card'] + totals_data['no_card']
-		percent = 0 if total_sum == 0 else 100.0 * (totals_data['has_card'] - not_firsts['not_firsts']) / total_sum
+		percent = 0 if total_sum == 0 else 100.0 * (totals_data['has_card'] - firsts['firsts']) / total_sum
 		dashboard_data['re_purchases_month'] = percent
 
 		""" Доля заполненных анкет """
