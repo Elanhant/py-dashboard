@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 MONGO_CLIENT_HOST = 'mongodb://127.0.0.1'
-MONGO_DB_NAME 		= 'cardsmile'
+MONGO_DB_NAME = 'cardsmile'
 POSTGRESQL_CONN_STRING = "dbname='1cardsmile' user='postgres' host='localhost' password='123456'"
 
 """ Имя коллекции, в которой хранятся чеки """
@@ -26,25 +26,24 @@ UPDATER_COLLECTION = 'dashboard_aggregated'
 """ Если указать True, то модуль заново пересчитает все показатели для администратора"""
 CLEAR_AGGREGATED_DATA = True
 
-
 """ Настройки вспомогательных коллекций """
 CLEAR_TEMPORARY_COLLECTIONS = True
 
-DASHBOARD_CHEQUES_MONTH_COLLECTION 		= 'py_tmp_ch_m'
-WEEKS_SALES_COLLECTION_PREFIX 				= 'py_tmp_s8w_'
-AGGREGATED_CARDS_BY_PURCHASES_SHOPS 	= 'py_tmp_cbp_shops'
-AGGREGATED_CARDS_BY_PURCHASES_BRANDS 	= 'py_tmp_cbp_brands'
-AGGREGATED_RE_PURCHASES_SHOPS 				= 'py_tmp_rp_shops'
-AGGREGATED_RE_PURCHASES_BRANDS 				= 'py_tmp_rp_brands'
-AGGREGATED_RE_PURCHASES_TOTALS_SHOPS 	= 'py_tmp_rp_t_shops'
+DASHBOARD_CHEQUES_MONTH_COLLECTION = 'py_tmp_ch_m'
+WEEKS_SALES_COLLECTION_PREFIX = 'py_tmp_s8w_'
+AGGREGATED_CARDS_BY_PURCHASES_SHOPS = 'py_tmp_cbp_shops'
+AGGREGATED_CARDS_BY_PURCHASES_BRANDS = 'py_tmp_cbp_brands'
+AGGREGATED_RE_PURCHASES_SHOPS = 'py_tmp_rp_shops'
+AGGREGATED_RE_PURCHASES_BRANDS = 'py_tmp_rp_brands'
+AGGREGATED_RE_PURCHASES_TOTALS_SHOPS = 'py_tmp_rp_t_shops'
 AGGREGATED_RE_PURCHASES_TOTALS_BRANDS = 'py_tmp_rp_t_brands'
-AGGREGATED_CHEQUES_PER_PERIOD					= 'py_tml_cpp'
+AGGREGATED_CHEQUES_PER_PERIOD = 'py_tml_cpp'
 
 """ Настройки отправки e-mail """
-MAILER_HOST 		= '127.0.0.1'
-MAILER_FROM 		= "abcd@efgh.com"
-MAILER_TO				= "ijkl@mnop.com"
-MAILER_SUBJECT 	= "Dashboard master crashed"
+MAILER_HOST = '127.0.0.1'
+MAILER_FROM = "abcd@efgh.com"
+MAILER_TO = "ijkl@mnop.com"
+MAILER_SUBJECT = "Dashboard master crashed"
 
 """ Настройки логирования """
-LOG_FILE_NAME 	= 'runtime.log'
+LOG_FILE_NAME = 'runtime.log'

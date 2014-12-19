@@ -6,7 +6,8 @@ from config import MONGO_CLIENT_HOST, MONGO_DB_NAME, DASHBOARD_CHEQUES_COLLECTIO
 
 current_milli_time = lambda: int(round(time.time() * 1000))
 
-class DashboardProcessor(object):	
+
+class DashboardProcessor(object):
 	pipeline = []
 
 	def __init__(self, map_key_name, start_ts=None, end_ts=None):
@@ -17,8 +18,8 @@ class DashboardProcessor(object):
 		self.start_ts = start_ts
 		self.end_ts = end_ts
 		self.collections = []
-		self.client 	= MongoClient(MONGO_CLIENT_HOST)
-		self.db 			= self.client[MONGO_DB_NAME]
+		self.client = MongoClient(MONGO_CLIENT_HOST)
+		self.db = self.client[MONGO_DB_NAME]
 		self.subset_collection = 'dashboard_processor_subset'
 		self.target_collection = 'dashboard_python_results'
 		self.source_collection = DASHBOARD_CHEQUES_COLLECTION
@@ -59,7 +60,7 @@ class DashboardProcessor(object):
 	def split_keys(self):
 		self.split_keys = self.db.command(
 			"splitVector", MONGO_DB_NAME + "." + self.source_collection,
-			keyPattern={self.map_key_name : 1}, 
+			keyPattern={self.map_key_name: 1},
 			maxChunkSizeBytes=32000
 		)['splitKeys']
 
@@ -84,7 +85,7 @@ class DashboardProcessor(object):
 
 		for t in self.threads:
 			t.join()
-			# print t
+		# print t
 
 	def process_results(self):
 		return []
@@ -99,12 +100,12 @@ class DashboardProcessor(object):
 			}, upsert=True
 		)
 
-	def drop_subset_collections(self):		
+	def drop_subset_collections(self):
 		for collection_name in self.collections:
 			self.db[collection_name].drop()
 
 
-	def aggregate_subset(self, min_v, max_v, subset_suffix = None):
+	def aggregate_subset(self, min_v, max_v, subset_suffix=None):
 		subset_collection_name = self.subset_collection + (str(min_v) if subset_suffix is None else str(subset_suffix))
 
 		single_key_match = {}
@@ -118,9 +119,9 @@ class DashboardProcessor(object):
 		new_pipeline.insert(0, {"$sort": single_key_sort})
 		new_pipeline.insert(0, {"$match": single_key_match})
 		if self.start_ts is not None and self.end_ts is not None:
-			new_pipeline.insert(0, {"$match": {"date": {"$gte": self.start_ts, "$lt": self.end_ts}}})			
+			new_pipeline.insert(0, {"$match": {"date": {"$gte": self.start_ts, "$lt": self.end_ts}}})
 		elif self.start_ts is not None:
-			new_pipeline.insert(0, {"$match": {"date": {"$gte": self.start_ts}}})			
+			new_pipeline.insert(0, {"$match": {"date": {"$gte": self.start_ts}}})
 		new_pipeline.append({"$out": subset_collection_name})
 
 		result = self.db.command("aggregate", self.source_collection, pipeline=new_pipeline, allowDiskUse=True)

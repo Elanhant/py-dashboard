@@ -20,8 +20,8 @@ if __name__ == '__main__':
 
 		# Составляем тело e-mail
 		msg = ("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n"
-       % (MAILER_FROM, ", ".join(MAILER_TO), MAILER_SUBJECT))
-		divider = '\n' + '='*5 + ' RUNTIME LOG ' + '='*5 + '\n'
+		       % (MAILER_FROM, ", ".join(MAILER_TO), MAILER_SUBJECT))
+		divider = '\n' + '=' * 5 + ' RUNTIME LOG ' + '=' * 5 + '\n'
 
 		# Сбрасываем указатель на начало лог-файла
 		f.seek(0)
