@@ -42,7 +42,6 @@ class DashboardMaster(object):
 
 		self.splitted_keys = None
 
-		self.brands_groups = []
 		self.cards_by_purchases = []
 
 		self.cards_data = []
@@ -68,75 +67,67 @@ class DashboardMaster(object):
 
 
 	def run(self):
+		""" Основной метод """
 		run_start = current_milli_time()
 		self.print_message("Dashboard Updater Started at %s, now filling cheques..." % time.ctime())
 
-		# Заполняем (или обновляем) собственную таблицу чеков
-		if self.client[self.db_name][DASHBOARD_CHEQUES_COLLECTION].count() == 0 or FORCE_REFILL is True:
-			self.fill_cheques()
-		else:
-			self.update_cheques()
-		self.print_message("Took %s ms to fill cheques, now splitting keys..." % (current_milli_time() - run_start,))
+		# Заполнение или обновление коллекции чеков
+		self.aggregate_cheques()
 
-		# Разбиваем коллекцию на блоки
-		t_start = current_milli_time()
+		# Разбиение ключей
 		self.split_keys()
-		self.print_message(
-			"Took %s ms to split keys, now getting POSTGRESQL data..." % (current_milli_time() - t_start,))
 
 		# При необходимости удаляем накопленные за прошлые запуски данные
 		if CLEAR_AGGREGATED_DATA is True:
 			self.client[self.db_name][UPDATER_COLLECTION].remove()
 
-		# Получаем данные из Postgresql-базы, сгрупированные по ID магазина
-		self.get_shops_postgre_data()
+		# Получаем данные по полу из Postgresql-базы
+		self.get_genders_data()
 
-		# Получаем данные из Postgresql-базы, сгрупированные по ID бренда
-		self.get_brands_postgre_data()
+		# Получаем данные по картам из Postgresql-базы
+		self.get_cards_data()
 
 		# Получаем данные количества клиентов по числу покупок из Postgresql-базы, сгрупированные по ID магазина
 		self.get_cards_by_purchases()
 
 		# Вычисляем и сохраняем в отдельные коллекции продажи за 8 недель, а также 
 		# доли повторных покупок и доли клиентов по числу покупок
-		t_start = current_milli_time()
 		self.run_aggregators()
-		self.print_message("Took %s ms to aggregate mongo data, now calculating admin dashboard..." % (
-		current_milli_time() - t_start,))
-
-		# Делаем выборку с ID несвязанных брендов
-		self.cur.execute(""" SELECT id, company_group_id FROM company""")
-		brands = self.cur.fetchall()
-		seen_groups = {}
-		for brand_tuple in brands:
-			if brand_tuple[1] == 0:
-				self.brands_groups.append(brand_tuple[0])
-			else:
-				seen_groups[brand_tuple[1]] = brand_tuple[0]
-		self.brands_groups += seen_groups.values()
 
 		# Вычисление дэшборда для администраторов
-		t_start = current_milli_time()
 		self.calculate_admin_dashboard()
-		self.print_message("Took %s ms to calculate admin dashboard, now calculating brands and shops dashboards..." % (
-		current_milli_time() - t_start,))
 
 		# Вычисление дэшбордов для брендов и магазинов
+		self.cur.execute(""" SELECT id, name FROM company ORDER BY id""")
+		brands = self.cur.fetchall()
+		self.print_message("="*80)
 		for brand_tuple in brands:
-			t_start = current_milli_time()
-			self.calculate_brand_dashboard(brand_tuple[0])
-			self.print_message("Took %s ms to calculate dashboard for brand %s, now calculating shops dashboards..." % (
-			current_milli_time() - t_start, brand_tuple[0]))
+			self.calculate_brand_dashboard(brand_tuple[0], brand_tuple[1])
 
 			self.cur.execute(""" SELECT id FROM shop WHERE company_id = %s """, (brand_tuple[0], ))
 			shops = self.cur.fetchall()
 			t_start = current_milli_time()
 			for shop_tuple in shops:
-				t_start = current_milli_time()
 				self.calculate_shop_dashboard(shop_tuple[0], brand_tuple[0])
-			print "Took %s ms to calculate shops dashboards for brand %s" % (
-			current_milli_time() - t_start, brand_tuple[0])
+			self.print_message("\tTook %s ms to calculate shops dashboards for current brand" % (current_milli_time()
+			                                                                                     - t_start,))
+			self.print_message("="*80)
 
+		self.clear_temporary_collections()
+
+		self.print_message("The time is %s, took %s ms to complete" % (time.ctime(), current_milli_time() - run_start))
+
+	def aggregate_cheques(self):
+		""" Заполняем (или обновляем) собственную таблицу чеков """
+		t_start = current_milli_time()
+		if self.client[self.db_name][DASHBOARD_CHEQUES_COLLECTION].count() == 0 or FORCE_REFILL is True:
+			self.fill_cheques()
+		else:
+			self.update_cheques()
+		self.print_message("Took %s ms to fill cheques, now splitting keys..." % (current_milli_time() - t_start,))
+
+	def clear_temporary_collections(self):
+		""" Удаление временных коллекций Mongo """
 		if CLEAR_TEMPORARY_COLLECTIONS is True:
 			for c in [DASHBOARD_CHEQUES_MONTH_COLLECTION, AGGREGATED_CARDS_BY_PURCHASES_SHOPS,
 			          AGGREGATED_CARDS_BY_PURCHASES_BRANDS, AGGREGATED_RE_PURCHASES_SHOPS,
@@ -146,12 +137,9 @@ class DashboardMaster(object):
 			for w in range(8):
 				self.client[self.db_name][WEEKS_SALES_COLLECTION_PREFIX + str(w)].drop()
 
-		self.print_message("The time is %s, took %s ms to complete" % (time.ctime(), current_milli_time() - run_start))
-
-
-	def get_shops_postgre_data(self):
-		t_start = current_milli_time()
+	def get_genders_data(self):
 		""" Соотношение полов """
+		t_start = current_milli_time()
 		self.cur.execute(""" SELECT 
 			SUM(CASE WHEN p.gender = \'m\' THEN 1 ELSE 0 END) AS male,
 			SUM(CASE WHEN p.gender = \'f\' THEN 1 ELSE 0 END) AS female,
@@ -166,31 +154,27 @@ class DashboardMaster(object):
 		self.genders_data = self.cur.fetchall()
 		self.print_message("Took %s ms to get genders data from POSTGRESQL DB" % (current_milli_time() - t_start, ))
 
-
-	def get_brands_postgre_data(self):
+	def get_cards_data(self):
+		""" Получение данных, связанных с акнетами участников """
 		t_start = current_milli_time()
-		""" Количество добавленнных карт """
-		""" Доли каналов коммуникации и согласных на рассылку """
-		""" Доля заполненных анкет """
-		""" Количество участников """
-		self.cur.execute(""" SELECT 
-			SUM(CASE WHEN t.channel = 3 THEN 1 ELSE 0 END)::FLOAT AS all, 
-			SUM(CASE WHEN t.channel = 1 THEN 1 ELSE 0 END)::FLOAT AS email, 
+		self.cur.execute(""" SELECT
+			SUM(CASE WHEN t.channel = 3 THEN 1 ELSE 0 END)::FLOAT AS all,
+			SUM(CASE WHEN t.channel = 1 THEN 1 ELSE 0 END)::FLOAT AS email,
 			SUM(CASE WHEN t.channel = 2 THEN 1 ELSE 0 END)::FLOAT AS sms,
 			SUM(CASE WHEN t.channel = 0 THEN 1 ELSE 0 END)::FLOAT AS unknown,
 			SUM(CASE WHEN t.subscription THEN 1 ELSE 0 END)::FLOAT as subscribed,
 			SUM(CASE WHEN t.date_create >= %s THEN 1 ELSE 0 END) as month,
 			SUM(CASE WHEN t.date_create >= %s THEN 1 ELSE 0 END) as week,
 			SUM(CASE WHEN t.date_create >= %s THEN 1 ELSE 0 END) as day,
-			SUM(CASE WHEN c.fullness = 0 THEN 1 ELSE 0 END)::FLOAT AS not_filled, 
-			SUM(CASE WHEN c.fullness = 1 THEN 1 ELSE 0 END)::FLOAT AS partially_filled, 
-			SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT AS filled, 
+			SUM(CASE WHEN c.fullness = 0 THEN 1 ELSE 0 END)::FLOAT AS not_filled,
+			SUM(CASE WHEN c.fullness = 1 THEN 1 ELSE 0 END)::FLOAT AS partially_filled,
+			SUM(CASE WHEN c.fullness = 2 THEN 1 ELSE 0 END)::FLOAT AS filled,
 			COUNT(c.fullness) as profiles,
 			SUM(CASE WHEN sh.company_id = t.company_id THEN 1 ELSE 0 END) as total,
 			t.company_id,
 			t.shop_id
-			FROM card t JOIN customer c 
-			ON t.customer_id = c.id 
+			FROM card t JOIN customer c
+			ON t.customer_id = c.id
 			JOIN shop sh ON sh.id = t.shop_id
 			WHERE t.status = 1
 			GROUP BY t.company_id, t.shop_id """, (self.month_start_ts, self.week_start_ts, self.yesterday_ts))
@@ -199,6 +183,7 @@ class DashboardMaster(object):
 
 
 	def get_cards_by_purchases(self):
+		""" Получение числа клиентов, сгрупированных по числу покупок """
 		t_start = current_milli_time()
 		self.cur.execute(""" SELECT 
 				SUM(CASE WHEN purchases = 1 THEN 1 ELSE 0 END) AS qty_1,
@@ -221,6 +206,9 @@ class DashboardMaster(object):
 
 
 	def run_aggregators(self):
+		""" Заполнение временных коллекций с промежуточными результатами в MongoDB """
+		t_start = current_milli_time()
+
 		""" Продажи за 8 недель """
 		sales_updater = admin_updaters.SalesUpdater()
 		sales_updater.run()
@@ -243,8 +231,12 @@ class DashboardMaster(object):
 		re_purchases_totals_updater = brands_updaters.RePurchasesMonthTotalsUpdater(split_keys=self.splitted_keys)
 		re_purchases_totals_updater.run()
 
+		self.print_message("Took %s ms to aggregate mongo data, now calculating admin dashboard..." % (
+		current_milli_time() - t_start,))
+
 
 	def fill_cheques(self):
+		""" Заполнение коллекции чеков """
 		self.client[self.db_name].command(
 			'aggregate',
 			CHEQUES_COLLECTION,
@@ -292,6 +284,7 @@ class DashboardMaster(object):
 
 
 	def update_cheques(self, days=30):
+		""" Обновление коллекции чеков """
 		start = self.today - timedelta(days=days)
 		start_ts = int(time.mktime(start.timetuple()))
 		self.client[self.db_name].command(
@@ -352,18 +345,25 @@ class DashboardMaster(object):
 
 
 	def split_keys(self, key='card_number'):
+		""" Разбиваем коллекцию на блоки """
+		t_start = current_milli_time()
 		self.splitted_keys = self.client[self.db_name].command(
 			"splitVector", self.db_name + "." + DASHBOARD_CHEQUES_COLLECTION,
 			keyPattern={key: 1},
-			maxChunkSizeBytes=32000
+			maxChunkSizeBytes=64000
 		)['splitKeys']
+		self.print_message(
+			"Took %s ms to split keys, now getting POSTGRESQL data..." % (current_milli_time() - t_start,))
 
 
 	def calculate_admin_dashboard(self):
+		""" Расчет показателей для дэшборда администраторов """
 		dashboard_data = {
 			'brand_id': 0,
 			'type': 'admin'
 		}
+		method_start = current_milli_time()
+		self.print_message("Calculating admin dashboard...")
 
 		""" Доля повторных покупок с начала года """
 		repurchases_updater = admin_updaters.RePurchasesUpdater(self.year_start_ts, 'admin_repurchases_year',
@@ -387,13 +387,11 @@ class DashboardMaster(object):
 			},
 			'subscribed': 0 if total == 0 else 100.0 * sum([data['subscribed'] for data in self.cards_data]) / total,
 		}
-
 		dashboard_data['channels_data'] = percents['channels']
 		dashboard_data['subscribed'] = percents['subscribed']
 
 		""" Доли клиентов с определенным числом покупок """
 		total = sum([data['total'] for data in self.cards_data])
-		cards_with_cheques = 0
 		percents = {
 			'qty_0': {
 				'label': 'Клиентов без покупок',
@@ -436,7 +434,6 @@ class DashboardMaster(object):
 			'female': 0 if total == 0 else 100.0 * sum([data['female'] for data in self.genders_data]) / total,
 			'undefined': 0 if total == 0 else 100.0 * sum([data['undefined'] for data in self.genders_data]) / total,
 		}
-
 		dashboard_data['genders_data'] = percents
 
 		""" Клиентская база """
@@ -504,19 +501,24 @@ class DashboardMaster(object):
 
 		self.update_dashboard({"brand_id": 0}, dashboard_data)
 
+		self.print_message("Took %s ms to calculate admin dashboard" % (current_milli_time() - method_start,))
 
-	def calculate_brand_dashboard(self, brand_id):
+
+	def calculate_brand_dashboard(self, brand_id, brand_name=""):
+		""" Расчет показателей для дэшбордов брэндов """
 		dashboard_data = {
 			'brand_id': brand_id,
 			'type': 'operator'
 		}
+		method_start = current_milli_time()
+		self.print_message("Calculating dashboard for brand '%s' (ID=%s)..." % (brand_name, brand_id,))
 
 		brand_cards_data = [d for d in self.cards_data if d['company_id'] == brand_id]
 		brand_genders_data = [d for d in self.genders_data if d['company_id'] == brand_id]
 		brand_cards_by_purchases = [d for d in self.cards_by_purchases if d['company_id'] == brand_id]
+		total = sum([d['total'] for d in brand_cards_data])
 
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
-		total = sum([d['total'] for d in brand_cards_data])
 		percents = {
 			'channels': {
 				'all': 0 if total == 0 else 100.0 * sum([d['all'] for d in brand_cards_data]) / total,
@@ -530,7 +532,6 @@ class DashboardMaster(object):
 		dashboard_data['subscribed'] = percents['subscribed']
 
 		""" Доли клиентов с определенным числом покупок """
-		total = sum([d['total'] for d in brand_cards_data])
 		percents = {
 			'qty_0': {
 				'label': 'Клиентов без покупок',
@@ -563,7 +564,6 @@ class DashboardMaster(object):
 		dashboard_data['re_purchases_month'] = percent
 
 		""" Доля заполненных анкет """
-		total = sum([d['profiles'] for d in brand_cards_data])
 		dashboard_data['filled_profiles'] = 0 if total == 0 else 100.0 * sum(
 			[d['filled'] for d in brand_cards_data]) / total
 
@@ -577,7 +577,7 @@ class DashboardMaster(object):
 		dashboard_data['purchased_with_cards'] = percent
 
 		""" Число участников """
-		dashboard_data['participants_count'] = sum([d['total'] for d in brand_cards_data])
+		dashboard_data['participants_count'] = total
 
 		""" Доля выданных бонусных карт с начала месяца """
 		data = {
@@ -604,7 +604,6 @@ class DashboardMaster(object):
 		dashboard_data['cards_added_day'] = 0 if cheques['day'] == 0 else 100.0 * data['day'] / cheques['day']
 
 		""" Соотношение полов """
-		total = sum([d['total'] for d in brand_genders_data])
 		percents = {
 			'male': 0 if total == 0 else 100.0 * sum([d['male'] for d in brand_genders_data]) / total,
 			'female': 0 if total == 0 else 100.0 * sum([d['female'] for d in brand_genders_data]) / total,
@@ -669,19 +668,20 @@ class DashboardMaster(object):
 		dashboard_data['last_day_customers'] = 0 if not data else data
 
 		""" Соотношение заполненных анкет """
-		total = sum([d['total'] for d in brand_cards_data])
 		percents = {
 			'not_filled': 0 if total == 0 else 100.0 * sum([d['not_filled'] for d in brand_cards_data]) / total,
 			'partially_filled': 0 if total == 0 else 100.0 * sum([d['partially_filled'] for d in brand_cards_data]) / total,
 			'filled': 0 if total == 0 else 100.0 * sum([d['filled'] for d in brand_cards_data]) / total,
 		}
-
 		dashboard_data['filled_data'] = percents
 
 		self.update_dashboard({"brand_id": brand_id}, dashboard_data)
 
+		self.print_message("Took %s ms to calculate current brand's dashboard" % (current_milli_time() - method_start,))
+
 
 	def calculate_shop_dashboard(self, shop_id, brand_id):
+		""" Расчет показателей для дэшбордов магазинов """
 		dashboard_data = {
 			'brand_id': brand_id,
 			'shop_id': shop_id,
@@ -691,9 +691,9 @@ class DashboardMaster(object):
 		shop_cards_data = [d for d in self.cards_data if d['shop_id'] == shop_id]
 		shop_genders_data = [d for d in self.genders_data if d['shop_id'] == shop_id]
 		shop_cards_by_purchases = [d for d in self.cards_by_purchases if d['shop_id'] == shop_id]
+		total = sum([d['total'] for d in shop_cards_data])
 
 		""" Соотношение каналов коммуникации и доля согласных на рассылку """
-		total = sum([d['total'] for d in shop_cards_data])
 		percents = {
 			'channels': {
 				'all': 0 if total == 0 else 100.0 * sum([d['all'] for d in shop_cards_data]) / total,
@@ -707,7 +707,6 @@ class DashboardMaster(object):
 		dashboard_data['subscribed'] = percents['subscribed']
 
 		""" Доли клиентов с определенным числом покупок """
-		total = sum([d['total'] for d in shop_cards_data])
 		percents = {
 			'qty_0': {
 				'label': 'Клиентов без покупок',
@@ -742,9 +741,9 @@ class DashboardMaster(object):
 		dashboard_data['re_purchases_month'] = percent
 
 		""" Доля заполненных анкет """
-		total = sum([d['profiles'] for d in shop_cards_data])
-		dashboard_data['filled_profiles'] = 0 if total == 0 else 100.0 * sum(
-			[d['filled'] for d in shop_cards_data]) / total
+		profiles = sum([d['profiles'] for d in shop_cards_data])
+		dashboard_data['filled_profiles'] = 0 if profiles == 0 else 100.0 * sum(
+			[d['filled'] for d in shop_cards_data]) / profiles
 
 		""" Доля продаж по картам с начала месяца """
 		purchases_with_cards_updater = shops_updaters.PurchasesWithCardsUpdater(brand_id, self.month_start_ts,
@@ -756,7 +755,7 @@ class DashboardMaster(object):
 		dashboard_data['purchased_with_cards'] = percent
 
 		""" Число участников """
-		dashboard_data['participants_count'] = sum([d['total'] for d in shop_cards_data])
+		dashboard_data['participants_count'] = total
 
 		""" Доли выданных бонусных карт с начала месяца, недели и вчерашнего дня """
 		data = {
@@ -771,7 +770,6 @@ class DashboardMaster(object):
 		dashboard_data['cards_added_day'] = 0 if cheques['day'] == 0 else 100.0 * data['day'] / cheques['day']
 
 		""" Соотношение полов """
-		total = sum([d['total'] for d in shop_genders_data])
 		percents = {
 			'male': 0 if total == 0 else 100.0 * sum([d['male'] for d in shop_genders_data]) / total,
 			'female': 0 if total == 0 else 100.0 * sum([d['female'] for d in shop_genders_data]) / total,
